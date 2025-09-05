@@ -7,6 +7,7 @@ graph TB
     subgraph UILayer["User Interface Layer"]
         UI["Gradio Web Interface<br/>Port 7860"]
         API["FastAPI Backend<br/>Port 8199"]
+        MAINT["Maintenance Buttons<br/>7 Operations"]
     end
     
     subgraph CoreLayer["Core Processing Layer"]
@@ -32,11 +33,14 @@ graph TB
     
     UI -->|"HTTP Requests"| API
     API -->|"HTTP Responses"| UI
+    MAINT -->|"Maintenance Operations"| API
     
     API -->|"Document Upload"| DP
     API -->|"Query Requests"| RP
     API -->|"System Info"| VS
     API -->|"Excel Info"| LIX
+    API -->|"Reset/Rebuild/Clear"| VS
+    API -->|"Reset/Rebuild/Clear"| LIX
     
     DP -->|"Processed Text"| DI
     DI -->|"Chunks + Metadata"| VS
@@ -64,7 +68,7 @@ graph TB
     classDef dataLayer fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef externalLayer fill:#fff3e0,stroke:#e65100,stroke-width:2px
     
-    class UI,API uiLayer
+    class UI,API,MAINT uiLayer
     class DP,VS,LIX,DI,RP,OC coreLayer
     class UPLOADS,PROCESSED,VECTOR_DB,LIX_DB dataLayer
     class OLLAMA,LLM externalLayer
