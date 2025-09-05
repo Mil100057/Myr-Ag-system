@@ -1,0 +1,36 @@
+# Core dependencies
+llama-index>=0.10.0
+fastapi>=0.116.0
+uvicorn[standard]>=0.35.0
+gradio>=5.44.0
+
+# Document processing
+docling>=0.1.0
+pypdf>=4.0.0
+python-docx>=1.1.0
+pandas>=2.0.0
+
+# Vector database (Dual architecture)
+leann-core>=0.3.0
+leann-backend-hnsw>=0.3.0
+
+# LlamaIndex components (Excel processing - EXPERIMENTAL)
+llama-index-llms-ollama>=0.1.0
+llama-index-embeddings-huggingface>=0.1.0
+
+# ML and embeddings
+sentence-transformers>=5.1.0
+torch>=2.8.0
+transformers>=4.56.0
+
+# Utilities
+python-multipart>=0.0.6
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+loguru>=0.7.0
+requests>=2.31.0
+
+# Optional: Weights & Biases for logging
+wandb>=0.16.0
+
+# Note: For development dependencies, see requirements-dev.txt
