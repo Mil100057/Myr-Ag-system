@@ -43,7 +43,7 @@ class DocumentIndexer:
         
         logger.info(f"Document indexer initialized with {store_type} + LlamaIndex for Excel")
     
-    def index_document(self, file_path: Path) -> bool:
+    def index_document(self, file_path: Path, force_domain: str = None) -> bool:
         """Index a single document into the appropriate vector store."""
         try:
             logger.info(f"Indexing document: {file_path}")
@@ -54,6 +54,9 @@ class DocumentIndexer:
             # Check if it's an Excel file
             if file_path.suffix.lower() == '.xlsx':
                 logger.info(f"Excel file detected, using LlamaIndex: {file_path}")
+                # Store domain metadata for Excel files too
+                if force_domain:
+                    self._store_domain_metadata_for_excel(file_path, force_domain)
                 return self._index_excel_with_llamaindex(processed_doc)
             else:
                 logger.info(f"Non-Excel file, using LEANN: {file_path}")
@@ -92,6 +95,46 @@ class DocumentIndexer:
         except Exception as e:
             logger.error(f"Error indexing Excel with LlamaIndex {processed_doc.file_path}: {e}")
             return False
+    
+    def _store_domain_metadata_for_excel(self, file_path: Path, domain: str):
+        """Store domain metadata for Excel files."""
+        try:
+            from config.settings import settings
+            processed_dir = Path(settings.DATA_DIR) / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create metadata file
+            metadata_file = processed_dir / f"{file_path.stem}.json"
+            
+            # Load existing metadata or create new
+            metadata = {}
+            if metadata_file.exists():
+                try:
+                    import json
+                    with open(metadata_file, 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
+                except Exception as e:
+                    logger.warning(f"Error loading existing metadata: {e}")
+            
+            # Update with domain information
+            from datetime import datetime
+            metadata.update({
+                "file_name": file_path.name,
+                "file_path": str(file_path),
+                "domain": domain,
+                "domain_updated": str(datetime.now()),
+                "processing_timestamp": metadata.get("processing_timestamp", str(datetime.now()))
+            })
+            
+            # Save metadata
+            import json
+            with open(metadata_file, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Stored domain metadata for Excel {file_path.name}: {domain}")
+            
+        except Exception as e:
+            logger.warning(f"Error storing domain metadata for Excel: {e}")
     
     def _index_with_leann(self, processed_doc: ProcessedDocument) -> bool:
         """Index non-Excel document using LEANN."""
@@ -269,7 +312,7 @@ class DocumentIndexer:
             # Unified vector store
             return self.vector_store.reset_collection()
     
-    def rebuild_leann_index(self) -> bool:
+    def rebuild_leann_index(self, domain: str = None) -> bool:
         """Rebuild LEANN index from existing processed documents (no reprocessing)."""
         try:
             logger.info("Rebuilding LEANN index from existing processed documents...")
@@ -280,16 +323,34 @@ class DocumentIndexer:
                 logger.warning("No processed documents directory found")
                 return False
             
-            # Find all non-Excel processed documents
+            # Find all non-Excel processed documents, optionally filtered by domain
             processed_docs = []
             for file_path in processed_dir.iterdir():
-                if file_path.is_file() and file_path.suffix.lower() == ".json":
+                if file_path.is_file() and file_path.suffix.lower() == ".json" and file_path.name.endswith("_processed.json"):
                     try:
                         import json
                         with open(file_path, 'r', encoding='utf-8') as f:
                             doc_data = json.load(f)
+                        
                         # Only process non-Excel files for LEANN
                         if not doc_data.get('metadata', {}).get('filename', '').lower().endswith('.xlsx'):
+                            # Filter by domain if specified
+                            if domain:
+                                # Get domain from the simple metadata file (without _processed)
+                                simple_metadata_file = file_path.parent / file_path.name.replace('_processed.json', '.json')
+                                doc_domain = 'general'  # default
+                                
+                                if simple_metadata_file.exists():
+                                    try:
+                                        with open(simple_metadata_file, 'r', encoding='utf-8') as f:
+                                            simple_data = json.load(f)
+                                        doc_domain = simple_data.get('domain', 'general')
+                                    except Exception as e:
+                                        logger.warning(f"Could not read domain from {simple_metadata_file}: {e}")
+                                
+                                if doc_domain != domain:
+                                    continue
+                            
                             processed_doc = ProcessedDocument(
                                 file_path=Path(doc_data['file_path']),
                                 content=doc_data['content'],
@@ -330,4 +391,23 @@ class DocumentIndexer:
             return False
         except Exception as e:
             logger.error(f"Error removing document {file_path}: {e}")
+            return False
+    
+    def rebuild_llamaindex_excel(self) -> bool:
+        """Rebuild LlamaIndex Excel index from existing processed Excel documents."""
+        try:
+            logger.info("Rebuilding LlamaIndex Excel index...")
+            
+            # Use the LlamaIndex processor to rebuild
+            success = self.llamaindex_processor.rebuild_excel_index()
+            
+            if success:
+                logger.info("LlamaIndex Excel index rebuilt successfully")
+            else:
+                logger.error("Failed to rebuild LlamaIndex Excel index")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error rebuilding LlamaIndex Excel index: {e}")
             return False

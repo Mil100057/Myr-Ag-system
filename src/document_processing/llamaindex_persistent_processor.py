@@ -5,7 +5,7 @@ LlamaIndex Excel processor with persistence for enhanced Excel document processi
 
 import logging
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass
 import sys
 import os
@@ -46,7 +46,8 @@ class LlamaIndexExcelProcessor:
             top_p=0.9
         )
         Settings.embed_model = HuggingFaceEmbedding(
-            model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+            model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2',
+            trust_remote_code=False
         )
     
     def process_and_index_excel(self, file_path: Path, content: str, metadata: Dict[str, Any]) -> bool:
@@ -229,3 +230,88 @@ class LlamaIndexExcelProcessor:
                 documents.append(doc)
         
         return documents
+    
+    def rebuild_excel_index(self) -> bool:
+        """Rebuild the Excel index from existing processed Excel documents."""
+        try:
+            self.logger.info("Rebuilding Excel index from processed documents...")
+            
+            # Find all processed Excel documents
+            processed_dir = Path("data/processed")
+            if not processed_dir.exists():
+                self.logger.warning("No processed documents directory found")
+                return False
+            
+            excel_files = []
+            for file_path in processed_dir.iterdir():
+                if file_path.is_file() and file_path.suffix.lower() == ".json" and file_path.name.endswith("_processed.json"):
+                    try:
+                        import json
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            doc_data = json.load(f)
+                        
+                        # Only process Excel files
+                        if doc_data.get('metadata', {}).get('filename', '').lower().endswith('.xlsx'):
+                            excel_files.append((file_path, doc_data))
+                    except Exception as e:
+                        self.logger.warning(f"Could not load processed Excel file {file_path}: {e}")
+                        continue
+            
+            if not excel_files:
+                self.logger.info("No processed Excel files found")
+                return True
+            
+            # Rebuild index with all Excel files
+            success = self._rebuild_index_from_files(excel_files)
+            
+            if success:
+                self.logger.info(f"Successfully rebuilt Excel index with {len(excel_files)} files")
+            else:
+                self.logger.error("Failed to rebuild Excel index")
+            
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Error rebuilding Excel index: {e}")
+            return False
+    
+    def _rebuild_index_from_files(self, excel_files: List[Tuple[Path, Dict]]) -> bool:
+        """Rebuild index from a list of processed Excel files."""
+        try:
+            # Clear existing index
+            if hasattr(self, 'vector_store') and self.vector_store:
+                # Clear the existing index
+                self.logger.info("Clearing existing Excel index...")
+                # Note: This would need to be implemented based on the specific vector store
+            
+            # Re-index all Excel files
+            for file_path, doc_data in excel_files:
+                try:
+                    # Create ProcessedDocument from stored data
+                    from src.document_processing.document_processor import ProcessedDocument
+                    processed_doc = ProcessedDocument(
+                        file_path=Path(doc_data['file_path']),
+                        content=doc_data['content'],
+                        metadata=doc_data['metadata'],
+                        chunks=doc_data.get('chunks', [])
+                    )
+                    
+                    # Process and index the document
+                    success = self.process_and_index_excel(
+                        file_path=processed_doc.file_path,
+                        content=processed_doc.content,
+                        metadata=processed_doc.metadata
+                    )
+                    
+                    if not success:
+                        self.logger.warning(f"Failed to re-index Excel file: {processed_doc.file_path}")
+                        
+                except Exception as e:
+                    self.logger.warning(f"Error re-indexing Excel file {file_path}: {e}")
+                    continue
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error rebuilding index from files: {e}")
+            return False

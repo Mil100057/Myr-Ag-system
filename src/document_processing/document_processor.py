@@ -2,6 +2,7 @@
 Document Processor for handling document ingestion, extraction, and chunking.
 """
 import logging
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from loguru import logger
 
 from config.settings import settings
 from .excel_processor import ExcelProcessor, ExcelChunk
+from ..utils.device_manager import device_manager
 
 
 @dataclass
@@ -36,6 +38,9 @@ class DocumentProcessor:
         self.chunk_size = settings.CHUNK_SIZE
         self.chunk_overlap = settings.CHUNK_OVERLAP
         
+        # Configure environment for Docling/EasyOCR to use CPU
+        self._configure_docling_environment()
+        
         # Initialize Docling converter
         self.docling_converter = DocumentConverter()
         
@@ -53,6 +58,22 @@ class DocumentProcessor:
         
         logger.info(f"Document processor initialized with chunk size: {self.chunk_size}, overlap: {self.chunk_overlap}")
         logger.info("Using enhanced hybrid chunking strategy: paragraph-based + enhanced SentenceSplitter")
+    
+    def _configure_docling_environment(self):
+        """Configure environment to force Docling/EasyOCR to use CPU."""
+        # Force CPU for Docling/EasyOCR components
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Disable CUDA
+        os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'  # Disable MPS limit
+        
+        # Fix tokenizers parallelism warning
+        os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+        # Set device to CPU for PyTorch operations in Docling
+        import torch
+        if hasattr(torch, 'set_default_device'):
+            torch.set_default_device('cpu')
+
+        logger.info("Configured Docling environment to use CPU only")
     
     def validate_file(self, file_path: Path) -> bool:
         """Validate if the file can be processed."""
@@ -76,6 +97,9 @@ class DocumentProcessor:
         """Extract text from document using Docling with PyPDF2 fallback."""
         try:
             logger.info(f"Extracting text from: {file_path}")
+            
+            # Ensure Docling uses CPU only (configured in __init__)
+            device_manager.cleanup_memory("mps")  # Clean MPS memory before Docling
             
             # Use Docling for text extraction
             result = self.docling_converter.convert(file_path)

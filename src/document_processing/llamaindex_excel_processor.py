@@ -71,7 +71,8 @@ class LlamaIndexExcelProcessor:
                 top_p=0.8
             )
             Settings.embed_model = HuggingFaceEmbedding(
-                model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+                model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2',
+                trust_remote_code=False
             )
             
             self.logger.info("✅ LlamaIndex configured with Ollama")

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 import time
 import logging
+from src.ui.user_guides import get_english_guide, get_french_guide, get_spanish_guide, get_german_guide
 
 # Configure logging
 logging.basicConfig(
@@ -38,7 +39,7 @@ class GradioFrontend:
         try:
             response = requests.get(f"{self.api_url}/health", timeout=15)
             is_healthy = response.status_code == 200
-            logger.info(f"API health check: {'✅ Healthy' if is_healthy else '❌ Unhealthy'}")
+            logger.info(f"API health check: {'Healthy' if is_healthy else 'Unhealthy'}")
             return is_healthy
         except Exception as e:
             logger.error(f"API health check failed: {e}")
@@ -83,11 +84,11 @@ class GradioFrontend:
             response = requests.post(f"{self.api_url}/system/change-model", json={"model_name": model_name}, timeout=30)
             if response.status_code == 200:
                 result = response.json()
-                return f"✅ {result.get('message', 'Model changed successfully')}"
+                return f"{result.get('message', 'Model changed successfully')}"
             else:
-                return f"❌ Failed to change model: {response.text}"
+                return f"Failed to change model: {response.text}"
         except Exception as e:
-            return f"❌ Error changing model: {str(e)}"
+            return f"Error changing model: {str(e)}"
     
     def refresh_models_list(self):
         """Refresh the list of available models from API."""
@@ -125,16 +126,16 @@ class GradioFrontend:
         while time.time() - start_time < max_wait_time:
             status = self.get_processing_status()
             if status.get("status") == "completed":
-                return f"✅ Processing completed successfully!\n{status.get('message', '')}"
+                return f"Processing completed successfully!\n{status.get('message', '')}"
             elif status.get("status") == "failed":
-                return f"❌ Processing failed: {status.get('message', 'Unknown error')}"
+                return f"Processing failed: {status.get('message', 'Unknown error')}"
             elif status.get("status") == "processing":
                 # Continue waiting
                 time.sleep(5)
             elif status.get("status") == "idle":
                 # Check if processing is actually happening by comparing document counts
                 if status.get("processed_documents", 0) > 0:
-                    return f"✅ Processing completed! {status.get('processed_documents')} documents are now available."
+                    return f"Processing completed! {status.get('processed_documents')} documents are now available."
                 else:
                     time.sleep(2)
             else:
@@ -159,7 +160,7 @@ class GradioFrontend:
                             file_content = f.read()
                         file_list.append(('files', (Path(file.name).name, file_content, 'application/octet-stream')))
                     except Exception as file_error:
-                        return f"❌ Error reading file {file.name}: {str(file_error)}"
+                        return f"Error reading file {file.name}: {str(file_error)}"
             
             # Upload files with increased timeout for hybrid chunking
             response = requests.post(
@@ -170,7 +171,7 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                upload_message = f"✅ {result['message']}\n\nUploaded files:\n" + "\n".join([f"- {Path(f).name}" for f in result['uploaded_files']])
+                upload_message = f"{result['message']}\n\nUploaded files:\n" + "\n".join([f"- {Path(f).name}" for f in result['uploaded_files']])
                 
                 # Check if any documents were actually processed
                 if result.get('processed_count', 0) == 0:
@@ -181,10 +182,10 @@ class GradioFrontend:
                 
                 return f"{upload_message}\n\n{processing_message}"
             else:
-                return f"❌ Upload failed: {response.text}"
+                return f"Upload failed: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error during upload: {str(e)}"
+            return f"Error during upload: {str(e)}"
     
     def upload_only_documents(self, files):
         """Upload documents without processing them."""
@@ -201,7 +202,7 @@ class GradioFrontend:
                             file_content = f.read()
                         file_list.append(('files', (Path(file.name).name, file_content, 'application/octet-stream')))
                     except Exception as file_error:
-                        return f"❌ Error reading file {file.name}: {str(file_error)}"
+                        return f"Error reading file {file.name}: {str(file_error)}"
             
             # Upload files without processing
             response = requests.post(
@@ -212,12 +213,12 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                return f"✅ {result['message']}\n\nUploaded files:\n" + "\n".join([f"- {Path(f).name}" for f in result['uploaded_files']])
+                return f"{result['message']}\n\nUploaded files:\n" + "\n".join([f"- {Path(f).name}" for f in result['uploaded_files']])
             else:
-                return f"❌ Upload failed: {response.text}"
+                return f"Upload failed: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error during upload: {str(e)}"
+            return f"Error during upload: {str(e)}"
     
     def process_existing_documents(self):
         """Process documents already in uploads directory."""
@@ -226,12 +227,12 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                return f"✅ {result['message']}"
+                return f"{result['message']}"
             else:
-                return f"❌ Processing failed: {response.text}"
+                return f"Processing failed: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error during processing: {str(e)}"
+            return f"Error during processing: {str(e)}"
     
     def process_uploaded_only_documents(self):
         """Process only documents that are uploaded but not yet processed."""
@@ -240,23 +241,259 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                message = f"✅ {result['message']}"
+                message = f"{result['message']}"
                 
                 # Add details about which files were processed
                 if result.get('unprocessed_files'):
-                    message += f"\n\n📁 Files processed:\n" + "\n".join([f"- {f}" for f in result['unprocessed_files']])
+                    message += f"\n\nFiles processed:\n" + "\n".join([f"- {f}" for f in result['unprocessed_files']])
                 
                 return message
             else:
-                return f"❌ Processing failed: {response.text}"
+                return f"Processing failed: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error during processing: {str(e)}"
+            return f"Error during processing: {str(e)}"
     
-    def query_documents(self, question, n_chunks, temperature, max_tokens, model_name=None, use_enhanced=False):
+    def get_domain_statistics(self):
+        """Get domain statistics from API."""
+        try:
+            response = requests.get(f"{self.api_url}/domains/statistics", timeout=30)
+            
+            if response.status_code == 200:
+                stats = response.json()
+                
+                # Format statistics
+                result = "Domain Statistics:\n\n"
+                for domain, info in stats.items():
+                    if "error" not in info:
+                        result += f"{domain.upper()}:\n"
+                        result += f"   Documents: {info.get('document_count', 0)}\n"
+                        result += f"   Chunks: {info.get('chunk_count', 0)}\n"
+                        result += f"   Status: {'Active' if info.get('is_initialized', False) else 'Inactive'}\n\n"
+                    else:
+                        result += f"{domain.upper()}: {info['error']}\n\n"
+                
+                return result
+            else:
+                return f"Failed to get domain statistics: {response.text}"
+                
+        except Exception as e:
+            return f"Error getting domain statistics: {str(e)}"
+    
+    
+    def reset_all_domain_indexes(self):
+        """Reset all domain indexes."""
+        try:
+            response = requests.post(f"{self.api_url}/domains/reset-all", timeout=120)
+            
+            if response.status_code == 200:
+                result = response.json()
+                results = result.get("results", {})
+                
+                message = f"{result['message']}\n\n"
+                message += "Reset Results:\n"
+                for domain, success in results.items():
+                    status = "Success" if success else "Failed"
+                    message += f"   {domain}: {status}\n"
+                
+                return message
+            else:
+                return f"Failed to reset all domains: {response.text}"
+                
+        except Exception as e:
+            return f"Error resetting all domains: {str(e)}"
+    
+    def rebuild_all_domain_indexes(self):
+        """Rebuild all domain indexes."""
+        try:
+            response = requests.post(f"{self.api_url}/domains/rebuild-all", timeout=300)
+            
+            if response.status_code == 200:
+                result = response.json()
+                results = result.get("results", {})
+                
+                message = f"{result['message']}\n\n"
+                message += "Rebuild Results:\n"
+                for domain, success in results.items():
+                    status = "Success" if success else "Failed"
+                    message += f"  {domain}: {status}\n"
+                
+                return message
+            else:
+                return f"Failed to rebuild all domains: {response.text}"
+                
+        except Exception as e:
+            return f"Error rebuilding all domains: {str(e)}"
+    
+    def update_index_description(self, selected_index):
+        """Update description based on selected index."""
+        descriptions = {
+            "general": "*Removes only the GENERAL LEANN vector index (main_collection), preserves domain-specific indexes and all processed documents*",
+            "financial": "*Manages the Financial domain index - processes financial documents with specialized chunking and retrieval*",
+            "legal": "*Manages the Legal domain index - processes legal documents with specialized chunking and retrieval*",
+            "medical": "*Manages the Medical domain index - processes medical documents with specialized chunking and retrieval*",
+            "academic": "*Manages the Academic domain index - processes academic documents with specialized chunking and retrieval*",
+            "all_indexes": "*Rebuilds ALL indexes: General LEANN + All specialized domains (financial, legal, medical, academic) + LlamaIndex Excel*",
+            "llamaindex": "*Removes only the LlamaIndex Excel index, preserves all processed Excel files and uploads*"
+        }
+        return descriptions.get(selected_index, "*Select an index above to see its description*")
+    
+    def update_clear_description(self, selected_clear):
+        """Update description based on selected clear operation."""
+        descriptions = {
+            "general": "*Removes General LEANN index + all processed documents (preserves uploads and domain-specific indexes)*",
+            "financial": "*Removes Financial domain index + financial processed documents only (preserves other domains and uploads)*",
+            "legal": "*Removes Legal domain index + legal processed documents only (preserves other domains and uploads)*",
+            "medical": "*Removes Medical domain index + medical processed documents only (preserves other domains and uploads)*",
+            "academic": "*Removes Academic domain index + academic processed documents only (preserves other domains and uploads)*",
+            "excel": "*Removes LlamaIndex Excel index + processed Excel files only (preserves uploads and other documents)*",
+            "all": "*Removes EVERYTHING: All indexes + all processed documents + all uploads (⚠️ DANGER: This will delete all your data!)*"
+        }
+        return descriptions.get(selected_clear, "*Select domain to clear above to see its description*")
+    
+    def reset_selected_index(self, selected_index, confirm):
+        """Reset the selected index."""
+        if not confirm:
+            return "Please confirm the reset operation by checking the confirmation box."
+        
+        try:
+            if selected_index == "general":
+                response = requests.post(f"{self.api_url}/system/reset-index", timeout=120)
+            elif selected_index in ["financial", "legal", "medical", "academic"]:
+                response = requests.post(f"{self.api_url}/domains/{selected_index}/reset", timeout=120)
+            elif selected_index == "all_indexes":
+                # Reset all indexes: general + domains + excel
+                general_response = requests.post(f"{self.api_url}/system/reset-index", timeout=120)
+                domains_response = requests.post(f"{self.api_url}/domains/reset-all", timeout=120)
+                excel_response = requests.post(f"{self.api_url}/system/reset-llamaindex", timeout=120)
+                
+                # Combine results
+                if general_response.status_code == 200 and domains_response.status_code == 200 and excel_response.status_code == 200:
+                    return "All indexes reset successfully: General + Domains + Excel"
+                else:
+                    return f"Partial reset completed. General: {general_response.status_code}, Domains: {domains_response.status_code}, Excel: {excel_response.status_code}"
+            elif selected_index == "llamaindex":
+                response = requests.post(f"{self.api_url}/system/reset-llamaindex", timeout=120)
+            else:
+                return "Invalid index selection."
+            
+            if response.status_code == 200:
+                result = response.json()
+                return f"{result['message']}"
+            else:
+                return f"Failed to reset {selected_index}: {response.text}"
+                
+        except Exception as e:
+            return f"Error resetting {selected_index}: {str(e)}"
+    
+    def rebuild_selected_index(self, selected_index):
+        """Rebuild the selected index."""
+        try:
+            if selected_index == "general":
+                response = requests.post(f"{self.api_url}/system/rebuild-index", timeout=300)
+            elif selected_index in ["financial", "legal", "medical", "academic"]:
+                response = requests.post(f"{self.api_url}/domains/{selected_index}/rebuild", timeout=300)
+            elif selected_index == "all_indexes":
+                response = requests.post(f"{self.api_url}/system/rebuild-all", timeout=300)
+            elif selected_index == "llamaindex":
+                response = requests.post(f"{self.api_url}/system/rebuild-llamaindex", timeout=300)
+            else:
+                return "Invalid index selection."
+            
+            if response.status_code == 200:
+                result = response.json()
+                if selected_index == "all_indexes":
+                    results = result.get("results", {})
+                    message = f"{result['message']}\n\n"
+                    message += "Rebuild Results:\n"
+                    for index_name, success in results.items():
+                        status = "Success" if success else "Failed"
+                        message += f"  {index_name}: {status}\n"
+                    return message
+                else:
+                    return f"{result['message']}"
+            else:
+                return f"Failed to rebuild {selected_index}: {response.text}"
+                
+        except Exception as e:
+            return f"Error rebuilding {selected_index}: {str(e)}"
+    
+    
+    def get_document_domain(self, file_path):
+        """Get the current domain of a document."""
+        try:
+            if not file_path:
+                return "No document selected"
+            
+            # The dropdown now contains just the file name
+            file_name = file_path
+            
+            response = requests.get(f"{self.api_url}/documents/{file_name}/domain", timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                domain = result.get("current_domain", "general")
+                return f"Current domain: {domain}"
+            else:
+                return f"Error: {response.text}"
+            
+        except Exception as e:
+            return f"Error: {str(e)}"
+    
+    
+    def upload_and_process_with_domain(self, files, domain):
+        """Upload and process documents with specified domain."""
+        try:
+            if not files:
+                return "Please select files first.", " No files selected"
+            
+            # Prepare files for upload - handle Gradio file objects
+            file_data = []
+            for file in files:
+                if hasattr(file, 'name') and file.name:
+                    # For Gradio file objects, read the file content
+                    try:
+                        with open(file.name, 'rb') as f:
+                            file_content = f.read()
+                        file_data.append(('files', (file.name.split('/')[-1], file_content, 'application/octet-stream')))
+                    except Exception as e:
+                        return f" Error reading file {file.name}: {str(e)}", f" File read error"
+            
+            # Upload directly with domain specification
+            response = requests.post(
+                f"{self.api_url}/documents/upload-with-domain",
+                files=file_data,
+                data={'domain': domain},
+                timeout=900
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                message = result.get("message", "Upload successful")
+                processed_count = result.get("processed_count", 0)
+                uploaded_files = result.get("uploaded_files", [])
+                
+                # Format success message
+                success_msg = f"{message}\n"
+                success_msg += f" Domain: {domain.upper()}\n"
+                success_msg += f"Processed: {processed_count}/{len(uploaded_files)} documents\n"
+                
+                if uploaded_files:
+                    success_msg += f"Files: {', '.join([Path(f).name for f in uploaded_files])}\n"
+                
+                return success_msg, f"Successfully uploaded and processed in {domain} domain"
+            else:
+                error_msg = f"Upload failed: {response.text}"
+                return error_msg, f"Upload error: {response.status_code}"
+                
+        except Exception as e:
+            error_msg = f"Error uploading documents: {str(e)}"
+            return error_msg, f"Upload error: {str(e)}"
+    
+    def query_documents(self, question, n_chunks, temperature, max_tokens, model_name=None, use_enhanced=False, use_specialized=False, pipeline_domain=None):
         """Query documents using RAG pipeline."""
         if not question.strip():
-            return "Please enter a question.", "❌ Please enter a question."
+            return "Please enter a question.", "Please enter a question."
         
         try:
             # Step 1: Prepare query request
@@ -271,8 +508,16 @@ class GradioFrontend:
             if model_name:
                 query_data["model"] = model_name
             
-            # Step 2: Choose endpoint based on enhanced flag
-            endpoint = "/query-enhanced" if use_enhanced else "/query"
+            # Step 2: Choose endpoint based on flags
+            if use_specialized:
+                if pipeline_domain and pipeline_domain != "auto":
+                    endpoint = f"/query-specialized/{pipeline_domain}"
+                else:
+                    endpoint = "/query-specialized"
+            elif use_enhanced:
+                endpoint = "/query-enhanced"
+            else:
+                endpoint = "/query"
             
             # Step 3: Send query to API
             response = requests.post(
@@ -291,7 +536,20 @@ class GradioFrontend:
                 answer += f"**Processing Time:** {result['processing_time']:.2f}s\n"
                 
                 # Add processing method info
-                if use_enhanced:
+                if use_specialized:
+                    pipeline_used = result.get('pipeline_used', 'unknown')
+                    domain = result.get('domain', 'unknown')
+                    answer += f"**Processing Method:** Specialized Pipeline ({pipeline_used})\n"
+                    answer += f"**Domain:** {domain}\n"
+                    
+                    # Add query enhancement info
+                    enhanced_query = result.get('enhanced_query', {})
+                    if enhanced_query and enhanced_query.get('enhanced'):
+                        answer += f"**Query Enhancement:**\n"
+                        answer += f"- Original: {enhanced_query.get('original', 'N/A')}\n"
+                        answer += f"- Enhanced: {enhanced_query.get('enhanced', 'N/A')}\n"
+                        answer += f"- Reason: {enhanced_query.get('reason', 'N/A')}\n"
+                elif use_enhanced:
                     answer += f"**Processing Method:** LlamaIndex + LEANN (Enhanced)\n"
                 else:
                     answer += f"**Processing Method:** LEANN (Standard)\n"
@@ -315,17 +573,17 @@ class GradioFrontend:
                 if use_enhanced and 'direct_answer' in result and result['direct_answer']:
                     answer += f"**Direct Answer:** {result['direct_answer']}\n\n"
                 
-                return answer, "✅ Query completed successfully!"
+                return answer, "Query completed successfully!"
             else:
-                return f"❌ Query failed: {response.text}", "❌ Query failed"
+                return f"Query failed: {response.text}", "Query failed"
                 
         except Exception as e:
-            return f"❌ Error during query: {str(e)}", "❌ Query error"
+            return f"Error during query: {str(e)}", "Query error"
     
     def query_documents_with_status(self, question, n_chunks, temperature, max_tokens, model_name=None, use_enhanced=False):
         """Query documents with status updates."""
         if not question.strip():
-            return "Please enter a question.", "❌ Please enter a question."
+            return "Please enter a question.", "Please enter a question."
         
         # Show initial status
         return self.query_documents(question, n_chunks, temperature, max_tokens, model_name, use_enhanced)
@@ -350,13 +608,25 @@ class GradioFrontend:
                 processed_docs = [doc for doc in documents if doc['chunk_count'] > 0]
                 uploaded_docs = [doc for doc in documents if doc['chunk_count'] == 0]
                 
+                
+                # Helper function to get domain for a document
+                def get_document_domain(file_name):
+                    try:
+                        domain_response = requests.get(f"{self.api_url}/documents/{file_name}/domain", timeout=5)
+                        if domain_response.status_code == 200:
+                            return domain_response.json().get("current_domain", "general")
+                    except:
+                        pass
+                    return "general"
+                
                 # Format document list
                 doc_list = ""
                 
                 if processed_docs:
-                    doc_list += "**✅ Processed Documents (Ready for Query):**\n\n"
+                    doc_list += "** Processed Documents (Ready for Query):**\n\n"
                     for i, doc in enumerate(processed_docs, 1):
-                        doc_list += f"{i}. **{doc['file_name']}**\n"
+                        domain = get_document_domain(doc['file_name'])
+                        doc_list += f"{i}. **{doc['file_name']}** ({domain.upper()})\n"
                         doc_list += f"   - Size: {doc['file_size']} bytes\n"
                         doc_list += f"   - Content: {doc['content_length']} characters\n"
                         doc_list += f"   - Chunks: {doc['chunk_count']}\n"
@@ -365,18 +635,19 @@ class GradioFrontend:
                 if uploaded_docs:
                     if processed_docs:
                         doc_list += "---\n\n"
-                    doc_list += "**📁 Uploaded Documents (Not Processed Yet):**\n\n"
+                    doc_list += "** Uploaded Documents (Not Processed Yet):**\n\n"
                     for i, doc in enumerate(uploaded_docs, 1):
-                        doc_list += f"{i}. **{doc['file_name']}**\n"
+                        domain = get_document_domain(doc['file_name'])
+                        doc_list += f"{i}. **{doc['file_name']}** ({domain.upper()})\n"
                         doc_list += f"   - Size: {doc['file_size']} bytes\n"
                         doc_list += f"   - Status: ⏳ Ready to process\n\n"
                 
                 return doc_list
             else:
-                return f"❌ Failed to retrieve documents: {response.text}"
+                return f" Failed to retrieve documents: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error retrieving documents: {str(e)}"
+            return f" Error retrieving documents: {str(e)}"
     
     def refresh_documents_with_dropdown(self):
         """Refresh documents and update both list and dropdown."""
@@ -384,33 +655,30 @@ class GradioFrontend:
             # Get document list
             doc_list = self.list_documents(force_refresh=True)
             
-            # Get documents for dropdown with status
+            # Get documents for dropdown with status and domain
             response = requests.get(f"{self.api_url}/documents", params={'refresh': 'true'}, timeout=60)
             dropdown_choices = []
             
             if response.status_code == 200:
                 documents = response.json()
                 for doc in documents:
-                    if doc['chunk_count'] > 0:
-                        status = "✅ Processed"
-                    else:
-                        status = "📁 Uploaded Only"
-                    dropdown_choices.append(f"{doc['file_name']} ({status})")
+                    
+                    dropdown_choices.append(doc['file_name'])
             
             return doc_list, gr.Dropdown(choices=dropdown_choices, value=None)
             
         except Exception as e:
-            error_msg = f"❌ Error refreshing documents: {str(e)}"
+            error_msg = f" Error refreshing documents: {str(e)}"
             return error_msg, gr.Dropdown(choices=[], value=None)
     
     def delete_document(self, file_name_with_status):
         """Delete a specific document."""
         if not file_name_with_status:
-            return "❌ Please select a document to delete.", gr.Dropdown(choices=[], value=None), "No document selected."
+            return "Please select a document to delete.", gr.Dropdown(choices=[], value=None), gr.Dropdown(choices=[], value=None)
         
         try:
-            # Extract the actual file name from the dropdown choice (remove status part)
-            file_name = file_name_with_status.split(" (")[0]  # Remove " (✅ Processed)" or " (📁 Uploaded Only)"
+            # The dropdown now contains just the file name
+            file_name = file_name_with_status
             
             # URL encode the file name
             import urllib.parse
@@ -420,31 +688,54 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                success_msg = f"✅ {result['message']}\n\nDeleted files:\n" + "\n".join(f"- {file}" for file in result.get('deleted_files', []))
+                success_msg = f"{result['message']}\n\nDeleted files:\n" + "\n".join(f"- {file}" for file in result.get('deleted_files', []))
                 
-                # Refresh the document list and dropdown
-                doc_list = self.list_documents(force_refresh=True)
+                # Use the same refresh function as other operations to ensure consistency
+                doc_list, doc_dropdown = self.refresh_documents_with_dropdown()
                 
-                # Get updated dropdown choices with status
-                docs_response = requests.get(f"{self.api_url}/documents", params={'refresh': 'true'}, timeout=60)
-                dropdown_choices = []
-                if docs_response.status_code == 200:
-                    documents = docs_response.json()
-                    for doc in documents:
-                        if doc['chunk_count'] > 0:
-                            status = "✅ Processed"
-                        else:
-                            status = "📁 Uploaded Only"
-                        dropdown_choices.append(f"{doc['file_name']} ({status})")
-                
-                return doc_list, gr.Dropdown(choices=dropdown_choices, value=None), success_msg
+                return doc_list, doc_dropdown, success_msg
             else:
-                error_msg = f"❌ Failed to delete document: {response.text}"
-                return self.list_documents(), gr.Dropdown(choices=[], value=None), error_msg
+                error_msg = f"Failed to delete document: {response.text}"
+                doc_list, doc_dropdown = self.refresh_documents_with_dropdown()
+                return doc_list, doc_dropdown, error_msg
                 
         except Exception as e:
-            error_msg = f"❌ Error deleting document: {str(e)}"
-            return self.list_documents(), gr.Dropdown(choices=[], value=None), error_msg
+            error_msg = f"Error deleting document: {str(e)}"
+            doc_list, doc_dropdown = self.refresh_documents_with_dropdown()
+            return doc_list, doc_dropdown, error_msg
+    
+    def delete_document_with_dropdown(self, file_name_with_status):
+        """Delete a specific document and refresh dropdowns."""
+        if not file_name_with_status:
+            return "Please select a document to delete.", gr.Dropdown(choices=[], value=None)
+        
+        try:
+            # The dropdown now contains just the file name
+            file_name = file_name_with_status
+            
+            # URL encode the file name
+            import urllib.parse
+            encoded_file_name = urllib.parse.quote(file_name, safe='')
+            
+            response = requests.delete(f"{self.api_url}/documents/{encoded_file_name}", timeout=60)
+            
+            if response.status_code == 200:
+                result = response.json()
+                success_msg = f"{result['message']}\n\nDeleted files:\n" + "\n".join(f"- {file}" for file in result.get('deleted_files', []))
+                
+                # Use the same refresh function as other operations to ensure consistency
+                doc_list, doc_dropdown = self.refresh_documents_with_dropdown()
+                
+                return doc_list, doc_dropdown
+            else:
+                error_msg = f"Failed to delete document: {response.text}"
+                doc_list, doc_dropdown = self.refresh_documents_with_dropdown()
+                return doc_list, doc_dropdown
+                
+        except Exception as e:
+            error_msg = f"Error deleting document: {str(e)}"
+            doc_list, doc_dropdown = self.refresh_documents_with_dropdown()
+            return doc_list, doc_dropdown
     
     def upload_and_process_documents_with_dropdown(self, files):
         """Upload and process documents, then refresh dropdown."""
@@ -459,9 +750,9 @@ class GradioFrontend:
                 documents = response.json()
                 for doc in documents:
                     if doc['chunk_count'] > 0:
-                        status = "✅ Processed"
+                        status = " Processed"
                     else:
-                        status = "📁 Uploaded Only"
+                        status = " Uploaded Only"
                     dropdown_choices.append(f"{doc['file_name']} ({status})")
         except Exception:
             dropdown_choices = []
@@ -473,22 +764,87 @@ class GradioFrontend:
         upload_result = self.upload_only_documents(files)
         doc_list = self.list_documents(force_refresh=True)
         
-        # Get updated dropdown choices with status
+        # Get updated dropdown choices with status and domain
         try:
             response = requests.get(f"{self.api_url}/documents", params={'refresh': 'true'}, timeout=60)
             dropdown_choices = []
             if response.status_code == 200:
                 documents = response.json()
                 for doc in documents:
-                    if doc['chunk_count'] > 0:
-                        status = "✅ Processed"
-                    else:
-                        status = "📁 Uploaded Only"
-                    dropdown_choices.append(f"{doc['file_name']} ({status})")
+                    
+                    dropdown_choices.append(doc['file_name'])
         except Exception:
             dropdown_choices = []
         
-        return upload_result, doc_list, gr.Dropdown(choices=dropdown_choices, value=None)
+        return upload_result, doc_list, gr.Dropdown(choices=dropdown_choices, value=None), gr.Dropdown(choices=dropdown_choices, value=None)
+    
+    def upload_only_documents_with_domain(self, files, domain):
+        """Upload only documents with domain assignment, then refresh dropdown."""
+        if not files:
+            return "No files selected for upload.", "", gr.Dropdown(choices=[], value=None)
+        
+        try:
+            # Prepare files for upload
+            file_list = []
+            for file in files:
+                if hasattr(file, 'name') and file.name:
+                    try:
+                        with open(file.name, 'rb') as f:
+                            file_content = f.read()
+                        file_list.append(('files', (Path(file.name).name, file_content, 'application/octet-stream')))
+                    except Exception as file_error:
+                        return f"Error reading file {file.name}: {str(file_error)}", "", gr.Dropdown(choices=[], value=None)
+            
+            # Upload files with domain metadata and process them
+            response = requests.post(
+                f"{self.api_url}/documents/upload-with-domain",
+                files=file_list,
+                data={'domain': domain},
+                timeout=300  # 5 minutes for upload and processing
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                upload_result = f" {result['message']}\n\nUploaded files:\n" + "\n".join([f"- {Path(f).name}" for f in result['uploaded_files']])
+            else:
+                upload_result = f" Upload failed: {response.text}"
+                return upload_result, "", gr.Dropdown(choices=[], value=None)
+            
+            # Refresh document list and dropdowns
+            doc_list = self.list_documents(force_refresh=True)
+            
+            # Get updated dropdown choices with status and domain
+            try:
+                response = requests.get(f"{self.api_url}/documents", params={'refresh': 'true'}, timeout=60)
+                dropdown_choices = []
+                if response.status_code == 200:
+                    documents = response.json()
+                    for doc in documents:
+                        # Get domain information
+                        domain = "general"  # Default
+                        try:
+                            domain_response = requests.get(f"{self.api_url}/documents/{doc['file_name']}/domain", timeout=5)
+                            if domain_response.status_code == 200:
+                                domain = domain_response.json().get("current_domain", "general")
+                        except:
+                            pass  # Use default if domain lookup fails
+                        
+                        
+                        
+                        if doc['chunk_count'] > 0:
+                            status = " Processed"
+                        else:
+                            status = " Uploaded Only"
+                        
+                        dropdown_choices.append(doc['file_name'])
+            except Exception:
+                dropdown_choices = []
+            
+            return upload_result, doc_list, gr.Dropdown(choices=dropdown_choices, value=None)
+            
+        except Exception as e:
+            error_msg = f" Error during upload: {str(e)}"
+            return error_msg, "", gr.Dropdown(choices=[], value=None)
     
     def reset_index(self):
         """Reset the vector index."""
@@ -497,12 +853,12 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                return f"✅ {result['message']}"
+                return f"{result['message']}"
             else:
-                return f"❌ Reset failed: {response.text}"
+                return f"Reset failed: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error during reset: {str(e)}"
+            return f" Error during reset: {str(e)}"
     
     def clear_documents(self):
         """Clear all documents and processed data."""
@@ -511,12 +867,12 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                return f"✅ {result['message']}"
+                return f"{result['message']}"
             else:
-                return f"❌ Clear failed: {response.text}"
+                return f"Clear failed: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error during clear: {str(e)}"
+            return f" Error during clear: {str(e)}"
     
     def clear_all(self):
         """Clear everything including uploads."""
@@ -525,31 +881,58 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                return f"✅ {result['message']}"
+                return f"{result['message']}"
             else:
-                return f"❌ Clear all failed: {response.text}"
+                return f"Clear all failed: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error during clear all: {str(e)}"
+            return f"Error during clear all: {str(e)}"
     
     # Enhancement 3: Methods with confirmation
     def reset_index_with_confirmation(self, confirm: bool):
         """Reset index with confirmation."""
         if not confirm:
-            return "❌ Operation cancelled - confirmation required"
+            return " Operation cancelled - confirmation required"
         return self.reset_index()
     
     def clear_documents_with_confirmation(self, confirm: bool):
         """Clear documents with confirmation."""
         if not confirm:
-            return "❌ Operation cancelled - confirmation required"
+            return " Operation cancelled - confirmation required"
         return self.clear_documents()
     
     def clear_all_with_confirmation(self, confirm: bool):
         """Clear everything with confirmation."""
         if not confirm:
-            return "❌ Operation cancelled - confirmation required"
+            return " Operation cancelled - confirmation required"
         return self.clear_all()
+    
+    def clear_selected_data(self, selected_clear, confirm):
+        """Clear the selected data."""
+        if not confirm:
+            return "Please confirm the clear operation by checking the confirmation box."
+        
+        try:
+            if selected_clear == "general":
+                response = requests.delete(f"{self.api_url}/system/clear-general", timeout=120)
+            elif selected_clear in ["financial", "legal", "medical", "academic"]:
+                response = requests.delete(f"{self.api_url}/system/clear-domain/{selected_clear}", timeout=120)
+            elif selected_clear == "excel":
+                response = requests.delete(f"{self.api_url}/system/clear-excel", timeout=120)
+            elif selected_clear == "all":
+                response = requests.delete(f"{self.api_url}/system/clear-all", timeout=120)
+            else:
+                return f" Unknown clear operation: {selected_clear}"
+            
+            if response.status_code == 200:
+                result = response.json()
+                return f"{result['message']}"
+            else:
+                return f"Clear failed: {response.text}"
+                
+        except Exception as e:
+            return f" Error during clear operation: {str(e)}"
+    
     
     def reset_llamaindex(self):
         """Reset LlamaIndex Excel index only (preserves processed files)."""
@@ -558,12 +941,12 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                return f"✅ {result['message']}"
+                return f"{result['message']}"
             else:
-                return f"❌ Error resetting LlamaIndex: {response.text}"
+                return f"Error resetting LlamaIndex: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error resetting LlamaIndex: {str(e)}"
+            return f"Error resetting LlamaIndex: {str(e)}"
     
     def clear_llamaindex(self):
         """Clear LlamaIndex Excel index and related data."""
@@ -572,7 +955,7 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                success_msg = f"✅ {result['message']}\n\n"
+                success_msg = f" {result['message']}\n\n"
                 
                 if result.get('deleted_processed_files'):
                     success_msg += f"Deleted processed files:\n" + "\n".join(f"- {file}" for file in result['deleted_processed_files']) + "\n\n"
@@ -582,10 +965,10 @@ class GradioFrontend:
                 
                 return success_msg
             else:
-                return f"❌ Error clearing LlamaIndex: {response.text}"
+                return f" Error clearing LlamaIndex: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error clearing LlamaIndex: {str(e)}"
+            return f" Error clearing LlamaIndex: {str(e)}"
     
     def rebuild_leann(self):
         """Rebuild LEANN index from existing processed documents."""
@@ -594,18 +977,46 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                return f"✅ {result['message']}"
+                return f"{result['message']}"
             else:
-                return f"❌ Error rebuilding LEANN: {response.text}"
+                return f"Error rebuilding LEANN: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error rebuilding LEANN: {str(e)}"
+            return f"Error rebuilding LEANN: {str(e)}"
     
     def reset_llamaindex_with_confirmation(self, confirm: bool):
         """Reset LlamaIndex with confirmation."""
         if not confirm:
-            return "❌ Operation cancelled - confirmation required"
+            return " Operation cancelled - confirmation required"
         return self.reset_llamaindex()
+    
+    def reset_domain_indexes_with_confirmation(self, confirm: bool):
+        """Reset all domain indexes with confirmation."""
+        if not confirm:
+            return " Operation cancelled - confirmation required"
+        return self.reset_domain_indexes()
+    
+    def reset_domain_indexes(self):
+        """Reset all domain-specific indexes."""
+        try:
+            response = requests.post(f"{self.api_url}/domains/reset-all", timeout=60)
+            
+            if response.status_code == 200:
+                result = response.json()
+                message = f"{result['message']}\n\n"
+                
+                if 'results' in result:
+                    message += "Domain reset results:\n"
+                    for domain, success in result['results'].items():
+                        status = "" if success else ""
+                        message += f"  {status} {domain}: {'Success' if success else 'Failed'}\n"
+                
+                return message
+            else:
+                return f" Error resetting domain indexes: {response.text}"
+                
+        except Exception as e:
+            return f" Error resetting domain indexes: {str(e)}"
     
     def rebuild_llamaindex(self):
         """Rebuild LlamaIndex Excel index from existing processed Excel files."""
@@ -614,17 +1025,17 @@ class GradioFrontend:
             
             if response.status_code == 200:
                 result = response.json()
-                return f"✅ {result['message']}"
+                return f"{result['message']}"
             else:
-                return f"❌ Error rebuilding LlamaIndex: {response.text}"
+                return f"Error rebuilding LlamaIndex: {response.text}"
                 
         except Exception as e:
-            return f"❌ Error rebuilding LlamaIndex: {str(e)}"
+            return f"Error rebuilding LlamaIndex: {str(e)}"
     
     def clear_llamaindex_with_confirmation(self, confirm: bool):
         """Clear LlamaIndex with confirmation."""
         if not confirm:
-            return "❌ Operation cancelled - confirmation required"
+            return " Operation cancelled - confirmation required"
         return self.clear_llamaindex()
     
     def get_llamaindex_status(self):
@@ -657,27 +1068,14 @@ class GradioFrontend:
             with gr.Tabs() as tabs:
                 
                 # Tab 1: RAG Query Interface
-                with gr.Tab("RAG Query", id=0):
+                with gr.Tab("✒️ RAG Query", id=0):
                     gr.Markdown("<div style='height: 20px;'></div>")
                     question_input = gr.Textbox(
                         label="Ask Questions About Your Documents",
                         placeholder="e.g., What is the main topic discussed in the documents?",
                         lines=3
                     )
-                    gr.Markdown("<div style='height: 20px;'></div>")
                     
-                    # Query Mode Selection - Simple Radio Button
-                    gr.Markdown("### Query Settings")
-                    
-                    query_mode = gr.Radio(
-                        choices=[
-                            ("Standard (LEANN only)", False),
-                            ("Excel Specific (LlamaIndex only-Experimental)", True)
-                        ],
-                        value=False,
-                        label="Query Method",
-                        info="Choose Excel Specific for Excel files only"
-                    )
                     
                     query_btn = gr.Button(
                         "🔍 Query Documents", 
@@ -686,41 +1084,59 @@ class GradioFrontend:
                         elem_id="query_btn"
                     )
                     
-                    gr.Markdown("<div style='height: 20px;'></div>")
+                    # Query Mode Selection - Enhanced with Specialized Pipelines
+                    gr.Markdown("### Query Settings")
+
+
+                    query_mode = gr.Radio(
+                        choices=[
+                            ("Standard", "standard"),
+                            ("Excel Specific (Exp.)", "excel"),
+                            ("Academic", "academic"),
+                            ("Financial", "financial"),
+                            ("Legal", "legal"),
+                            ("Medical", "medical")
+                        ],
+                        value="standard",
+                        label="Query Method",
+                        info="Choose the appropriate method for your document type and domain"
+                    )
                     
-                    # Model Selection Accordion
-                    with gr.Accordion("LLM Model Selection", open=False):
-                        model_selector = gr.Dropdown(
-                            choices=["llama3.2:3b", "llama3.2:7b", "llama3.2:13b", "llama3.2:70b"],
-                            value="llama3.2:3b",
-                            label="LLM Model",
-                            info="Select the model for your queries",
-                            allow_custom_value=True
-                        )
+                                        
+                    # Model Selection and Search Parameters - Side by Side
+                    with gr.Row():
+                        # Model Selection Accordion
+                        with gr.Column():
+                            with gr.Accordion("LLM Model Selection", open=False):
+                                model_selector = gr.Dropdown(
+                                    choices=["llama3.2:3b", "llama3.2:7b"],
+                                    value="llama3.2:3b",
+                                    label="Select the model for your queries",
+                                    allow_custom_value=True
+                                )
+                                
+                                with gr.Row():
+                                    change_model_btn = gr.Button("🔄 Change Model", variant="secondary", size="lg")
+                                    refresh_models_btn = gr.Button("🔄 Refresh Models", variant="secondary", size="lg")
+                                
+                                model_change_output = gr.Textbox(label="Model Change Status", lines=2, visible=False)
                         
-                        with gr.Row():
-                            change_model_btn = gr.Button("🔄 Change Model", variant="secondary", size="lg")
-                            refresh_models_btn = gr.Button("🔄 Refresh Models", variant="secondary", size="lg")
-                        
-                        model_change_output = gr.Textbox(label="Model Change Status", lines=2, visible=False)
-                    
-                    # Query Parameters Accordion
-                    with gr.Accordion("Search Parameters", open=False):
-                        with gr.Row():
-                            n_chunks_input = gr.Slider(
-                                minimum=1, maximum=40, value=20, step=2,
-                                label="Chunks to retrieve"
-                            )
-                            temperature_input = gr.Slider(
-                                minimum=0.1, maximum=1.0, value=0.7, step=0.1,
-                                label="Temperature"
-                            )
-                            max_tokens_input = gr.Slider(
-                                minimum=100, maximum=4000, value=2048, step=100,
-                                label="Max tokens"
-                            )
-                    
-                    gr.Markdown("<div style='height: 20px;'></div>")
+                        # Search Parameters Accordion
+                        with gr.Column():
+                            with gr.Accordion("Search Parameters", open=False):
+                                with gr.Row():
+                                    n_chunks_input = gr.Slider(
+                                        minimum=1, maximum=40, value=20, step=2,
+                                        label="Chunks"
+                                    )
+                                    temperature_input = gr.Slider(
+                                        minimum=0.1, maximum=1.0, value=0.3, step=0.1,
+                                        label="Temperature"
+                                    )
+                                    max_tokens_input = gr.Slider(
+                                        minimum=100, maximum=4000, value=2048, step=100,
+                                        label="Max tokens"
+                                    )
                     
                     # Query status and progress
                     query_status = gr.Textbox(
@@ -733,16 +1149,32 @@ class GradioFrontend:
                     query_output = gr.Markdown(label="Query Result")
                 
                 # Tab 2: Document Management
-                with gr.Tab("📁 Document Management", id=1):
-                    gr.Markdown("### Upload and Manage Your Documents")
+                with gr.Tab(" Document Management", id=1):
+                    gr.Markdown("                                    ")
                     
                     # Document Upload Section
-                    gr.Markdown("#### Upload Documents")
                     file_input = gr.File(
-                        label="Select Documents",
+                        label="Select Documents to upload",
                         file_count="multiple",
                         file_types=[".pdf", ".docx", ".txt", ".md", ".html", ".xlsx", ".pptx", ".csv", ".png", ".jpeg", ".jpg", ".tiff", ".bmp", ".webp", ".adoc", ".xml"]
                     )
+                    
+                    # Domain Selection for Upload   
+
+                    with gr.Row():
+                        upload_domain_selector = gr.Dropdown(
+                            choices=[
+                                ("Financial", "financial"),
+                                ("Legal", "legal"), 
+                                ("Medical", "medical"),
+                                ("Academic", "academic"),
+                                ("Excel", "excel"),
+                                ("General", "general")
+                            ],
+                            value="general",
+                            label="Target Domain",
+                            info="Select the domain that best fits your documents"
+                        )
                     
                     # Upload buttons in single column
                     upload_btn = gr.Button("Upload & Process", variant="primary", size="lg")
@@ -768,6 +1200,10 @@ class GradioFrontend:
                     # Visual separator
                     gr.Markdown("---")
                     
+                    
+                    # Visual separator
+                    gr.Markdown("---")
+                    
                     # Document deletion section
                     gr.Markdown("#### Delete Documents")
                     gr.Markdown("⚠️ **Warning**: This will permanently delete the selected document from both uploads and processed data, and remove it from the search index.")
@@ -781,54 +1217,77 @@ class GradioFrontend:
                     )
                     delete_doc_btn = gr.Button("🗑️ Delete Document", variant="stop", size="lg")
                 
+                    # Visual separator
+                    gr.Markdown("---")
+                    
+                    # Domain Management Section
+                    gr.Markdown("#### 🎯 Domain-Specific Management")
+                    gr.Markdown("Manage documents by domain (Financial, Legal, Medical, Academic) for better organization and search performance.")
+                    
+                    # Domain statistics
+                    domain_stats_output = gr.Textbox(label="Domain Statistics", lines=6, interactive=False, value=self.get_domain_statistics())
+                    
+                    with gr.Row():
+                        refresh_domain_stats_btn = gr.Button("🔄 Refresh Domain Stats", variant="secondary", size="lg")
+                        reset_all_domains_btn = gr.Button("🔄 Reset All Domains", variant="stop", size="lg")
+                    
+                
                 # Tab 3: System Management
                 with gr.Tab("⚙️ System Management", id=2):
-                    gr.Markdown("### Monitor and Maintain Your System")
+                    gr.Markdown("                                    ")
                     
                     # System Maintenance Section
                     gr.Markdown("#### ⚠️ System Maintenance / Warning: These actions cannot be undone!")
                     gr.Markdown("---")
                     
+                    # Index Management with Radio Selection
+                    gr.Markdown("#### Index Management")
                     
-                    # Maintenance buttons with confirmation
-                    with gr.Row():
-                        reset_leann_btn = gr.Button("Reset LEANN Index", variant="secondary", size="lg")
-                        reset_leann_confirm = gr.Checkbox(label="Confirm Reset LEANN Index", value=False)
-                    
-                    reset_leann_desc = gr.Markdown("**Reset LEANN Index**: Removes only the LEANN vector index, preserves all LEANN processed documents and uploads")
-                    gr.Markdown("---")
+                    index_selector = gr.Radio(
+                         choices=[
+                             ("General Index", "general"),
+                             ("Academic Domain", "academic"),
+                             ("Financial Domain", "financial"),
+                             ("Legal Domain", "legal"),
+                             ("Medical Domain", "medical"),
+                             ("Excel", "llamaindex"),
+                             ("All Indexes", "all_indexes")
+                         ],
+                         value="general",
+                         label="Select Index to Manage",
+                     )
 
                     with gr.Row():
-                        rebuild_leann_btn = gr.Button("Rebuild LEANN Index", variant="primary", size="lg")
+                        reset_index_btn = gr.Button("Reset Selected Index", variant="secondary", size="lg")
+                        rebuild_index_btn = gr.Button("Rebuild Selected Index", variant="primary", size="lg")
                     
-                    with gr.Row():
-                        reset_llamaindex_btn = gr.Button("Reset LlamaIndex Excel", variant="secondary", size="lg")
-                        reset_llamaindex_confirm = gr.Checkbox(label="Confirm Reset LlamaIndex Excel", value=False)
+                    reset_confirm = gr.Checkbox(label="Confirm Reset Operation", value=False)
                     
-                    reset_llamaindex_desc = gr.Markdown("**Reset LlamaIndex Excel**: Removes only the LlamaIndex Excel index, preserves all processed Excel files and uploads")
+                    index_description = gr.Markdown("*Select an index above to see its description*")
                     gr.Markdown("---")
 
-                    with gr.Row():
-                        rebuild_llamaindex_btn = gr.Button("Rebuild LlamaIndex Excel", variant="primary", size="lg")
+                    gr.Markdown("<div style='height: 20px;'></div>")
+                    gr.Markdown("#### Clearing Operations")
+                    
+                    clear_selector = gr.Radio(
+                        choices=[
+                            ("General Index", "general"),
+                            ("Financial Domain", "financial"),
+                            ("Legal Domain", "legal"),
+                            ("Medical Domain", "medical"),
+                            ("Academic Domain", "academic"),
+                            ("Excel Index", "excel"),
+                            ("All Data", "all")
+                        ],
+                        value="general",
+                        label="Select Domain to Clear",
+                    )
                     
                     with gr.Row():
-                        clear_leann_btn = gr.Button("Clear LEANN Documents", variant="secondary", size="lg")
-                        clear_leann_confirm = gr.Checkbox(label="Confirm Clear LEANN Documents", value=False)
+                        clear_selected_btn = gr.Button("Clear Selected Domain", variant="secondary", size="lg")
+                        clear_confirm = gr.Checkbox(label="Confirm Clear Operation", value=False)
                     
-                    clear_leann_desc = gr.Markdown("**Clear LEANN Documents**: Removes LEANN index + non-Excel processed documents only (preserves processed Excel files)")
-                    gr.Markdown("---")
-
-                    with gr.Row():
-                        clear_llamaindex_btn = gr.Button("Clear LlamaIndex Excel", variant="secondary", size="lg")
-                        clear_llamaindex_confirm = gr.Checkbox(label="Confirm Clear LlamaIndex Excel", value=False)
-                    
-                    clear_llamaindex_desc = gr.Markdown("**Clear LlamaIndex Excel**: Removes LlamaIndex Excel index + processed Excel files only, preserves uploads")
-                    gr.Markdown("---")
-                    with gr.Row():
-                        clear_all_btn = gr.Button("Clear Everything", variant="stop", size="lg")
-                        clear_all_confirm = gr.Checkbox(label="Confirm Clear Everything", value=False)
-                    
-                    clear_all_desc = gr.Markdown("**Clear Everything**: Removes EVERYTHING (LEANN index + LlamaIndex + all processed documents + all uploads)")
+                    clear_description = gr.Markdown("*Select domain to clear above to see its description*")
                     gr.Markdown("---")
                     
                     management_output = gr.Textbox(label="Operation Result", lines=3)
@@ -866,7 +1325,7 @@ class GradioFrontend:
                     gr.Markdown("### Myr-Ag RAG System - Complete User Guide")
                     
                     # Language Selection
-                    with gr.Accordion("🌍 Language / Langue / Idioma / Sprache", open=True):
+                    with gr.Accordion("🌍 Language / Langue / Idioma / Sprache", open=False):
                         language_selector = gr.Radio(
                             choices=["English", "Français", "Español", "Deutsch"],
                             value="English",
@@ -875,7 +1334,7 @@ class GradioFrontend:
                     
                     # English Guide
                     with gr.Group(visible=True) as english_guide:
-                        with gr.Accordion("🎯 System Overview", open=True):
+                        with gr.Accordion("🎯 System Overview", open=False):
                             gr.Markdown("""
                             **Myr-Ag** is a powerful RAG (Retrieval-Augmented Generation) system that allows you to:
                             
@@ -891,7 +1350,7 @@ class GradioFrontend:
                             The system uses advanced document processing, vector embeddings, and local LLM inference to provide accurate, contextual answers optimized for different document types.
                             """)
                         
-                        with gr.Accordion("📁 Document Management", open=False):
+                        with gr.Accordion(" Document Management", open=False):
                             gr.Markdown("""
                             ### Uploading Documents
                             
@@ -970,10 +1429,10 @@ class GradioFrontend:
                             
                             | Parameter | Standard Method | Excel Specific Method |
                             |-----------|----------------|---------------------|
-                            | Chunks to Retrieve | ✅ Used (1-40) | ❌ Ignored (processes all data) |
-                            | Temperature | ✅ Used | ✅ Used |
-                            | Max Tokens | ✅ Used | ✅ Used |
-                            | Model Selection | ✅ Used | ✅ Used |
+                            | Chunks to Retrieve |  Used (1-40) |  Ignored (processes all data) |
+                            | Temperature |  Used |  Used |
+                            | Max Tokens |  Used |  Used |
+                            | Model Selection |  Used |  Used |
                             """)
                         
                         with gr.Accordion("⚙️ LLM Parameters Explained", open=False):
@@ -1024,7 +1483,7 @@ class GradioFrontend:
                             * Chunks: 30-40, Temperature: 0.5, Max Tokens: 4000
                             """)
                         
-                        with gr.Accordion("📊 Excel Querying Examples", open=False):
+                        with gr.Accordion("Excel Querying Examples", open=False):
                             gr.Markdown("""
                             ### Excel-Specific Querying (EXPERIMENTAL)
                             
@@ -1118,7 +1577,7 @@ class GradioFrontend:
                             * **Cross-language queries** are supported but may have reduced accuracy
                             """)
                         
-                        with gr.Accordion("⚙️ Query Methods", open=True):
+                        with gr.Accordion("⚙️ Query Methods", open=False):
                             gr.Markdown("""
                             ### Understanding Query Methods
                             
@@ -1159,16 +1618,16 @@ class GradioFrontend:
                             #### **Parameter Impact by Method**
                             
                             **Standard Method:**
-                            * ✅ **Chunks to Retrieve**: Controls how many document chunks to search
-                            * ✅ **Temperature**: Controls response creativity
-                            * ✅ **Max Tokens**: Controls response length
-                            * ✅ **Model**: Controls which LLM to use
+                            *  **Chunks to Retrieve**: Controls how many document chunks to search
+                            *  **Temperature**: Controls response creativity
+                            *  **Max Tokens**: Controls response length
+                            *  **Model**: Controls which LLM to use
                             
                             **Excel Specific Method:**
-                            * ❌ **Chunks to Retrieve**: Ignored (processes ALL Excel data)
-                            * ✅ **Temperature**: Controls response creativity
-                            * ✅ **Max Tokens**: Controls response length
-                            * ✅ **Model**: Controls which LLM to use
+                            *  **Chunks to Retrieve**: Ignored (processes ALL Excel data)
+                            *  **Temperature**: Controls response creativity
+                            *  **Max Tokens**: Controls response length
+                            *  **Model**: Controls which LLM to use
                             
                             #### **Choosing the Right Method**
                             
@@ -1215,7 +1674,7 @@ class GradioFrontend:
                             * **Text Extraction**: Docling (primary) with pypdf fallback for PDFs
                             * **Supported Formats**: PDF, DOCX, XLSX, PPTX, TXT, MD, HTML, XHTML, CSV, PNG, JPEG, TIFF, BMP, WEBP, AsciiDoc, XML
                             * **Processing Dependencies**: Docling for complex formats, pypdf for web-printed PDFs, direct text reading for simple files
-                            * **Embedding Model**: paraphrase-multilingual-MiniLM-L12-v2 (384 dimensions)
+                            * **Embedding Model**: nomic-embed-text-v2-moe (768 dimensions)
                             * **Vector Database**: LEANN with ultra-efficient storage (97% space savings)
                             
                             **LLM Integration:**
@@ -1293,84 +1752,11 @@ class GradioFrontend:
                             """)
                         
                         with gr.Accordion("🔧 System Management", open=False):
-                            gr.Markdown("""
-                            ### Managing Your System
-                            
-                            The system provides comprehensive management tools for maintaining your document collections and indexes.
-                            
-                            #### **Document Management**
-                            
-                            **View Documents:**
-                            * **Document List**: See all uploaded and processed documents
-                            * **Status Information**: View processing status, chunk counts, and file sizes
-                            * **Delete Documents**: Remove individual documents from the system
-                            
-                            **Upload Options:**
-                            * **Upload & Process**: Immediately process documents for querying
-                            * **Upload Only**: Store documents without processing
-                            * **Process Existing**: Process documents already in uploads
-                            * **Process Uploaded Only**: Process only unprocessed documents
-                            
-                            #### **System Maintenance**
-                            
-                            **Reset Operations (Index Only):**
-                            * **Reset LEANN Index**: Rebuilds LEANN index, preserves all data
-                            * **Reset LlamaIndex Excel**: Rebuilds LlamaIndex index, preserves all data
-                            
-                            **Rebuild Operations (Fast, No Reprocessing):**
-                            * **Rebuild LEANN Index**: Rebuilds from existing processed documents
-                            * **Rebuild LlamaIndex Excel**: Rebuilds from existing Excel processed files
-                            
-                            **Clear Operations (Index + Data):**
-                            * **Clear LEANN Documents**: Removes LEANN index + non-Excel processed documents
-                            * **Clear LlamaIndex Excel**: Removes LlamaIndex index + processed Excel files
-                            * **Clear Everything**: Removes all indexes and all data
-                            
-                            #### **Vector Store Management**
-                            
-                            **LEANN Vector Store:**
-                            * **Status Monitoring**: View index status, document count, and size
-                            * **Index Information**: See configuration and performance metrics
-                            * **Refresh Status**: Update status information in real-time
-                            
-                            **LlamaIndex Excel Store:**
-                            * **Status Monitoring**: View Excel index status and file counts
-                            * **Excel File Tracking**: Monitor uploaded and processed Excel files
-                            * **Refresh Status**: Update Excel index information
-                            
-                            #### **System Information**
-                            
-                            **Model Management:**
-                            * **Available Models**: View all installed Ollama models
-                            * **Model Selection**: Choose the best model for your needs
-                            * **Refresh Models**: Update the model list from Ollama
-                            
-                            **Processing Status:**
-                            * **Real-time Monitoring**: See current processing status
-                            * **Queue Information**: View pending processing tasks
-                            * **Performance Metrics**: Monitor system performance
-                            
-                            #### **Best Practices for System Management**
-                            
-                            **Regular Maintenance:**
-                            * Use "Rebuild" operations for quick index refresh
-                            * Use "Reset" operations when indexes become corrupted
-                            * Use "Clear" operations only when you want to remove data
-                            
-                            **Troubleshooting:**
-                            * If queries return poor results, try rebuilding the relevant index
-                            * If processing fails, check the logs and try reprocessing
-                            * If memory issues occur, clear unused data and rebuild
-                            
-                            **Data Safety:**
-                            * Always backup important documents before major operations
-                            * Use "Reset" instead of "Clear" when possible
-                            * Test operations on small datasets first
-                            """)
+                            gr.Markdown(get_english_guide())
                     
                     # French Guide
                     with gr.Group(visible=False) as french_guide:
-                        with gr.Accordion("🎯 Vue d'ensemble du système", open=True):
+                        with gr.Accordion("🎯 Vue d'ensemble du système", open=False):
                             gr.Markdown("""
                             **Myr-Ag** est un système RAG (Retrieval-Augmented Generation) puissant qui vous permet de :
                             
@@ -1386,7 +1772,7 @@ class GradioFrontend:
                             Le système utilise un traitement de documents avancé, des embeddings vectoriels et une inférence LLM locale pour fournir des réponses précises et contextuelles optimisées pour différents types de documents.
                             """)
                         
-                        with gr.Accordion("📁 Gestion des documents", open=False):
+                        with gr.Accordion(" Gestion des documents", open=False):
                             gr.Markdown("""
                             ### Téléchargement de documents
                             
@@ -1461,10 +1847,10 @@ class GradioFrontend:
                             
                             | Paramètre | Méthode Standard | Méthode Spécifique Excel |
                             |-----------|------------------|-------------------------|
-                            | Chunks à récupérer | ✅ Utilisé (1-40) | ❌ Ignoré (traite toutes les données) |
-                            | Température | ✅ Utilisé | ✅ Utilisé |
-                            | Max Tokens | ✅ Utilisé | ✅ Utilisé |
-                            | Sélection du modèle | ✅ Utilisé | ✅ Utilisé |
+                            | Chunks à récupérer |  Utilisé (1-40) |  Ignoré (traite toutes les données) |
+                            | Température |  Utilisé |  Utilisé |
+                            | Max Tokens |  Utilisé |  Utilisé |
+                            | Sélection du modèle |  Utilisé |  Utilisé |
                             """)
                         
                         with gr.Accordion("⚙️ Paramètres LLM expliqués", open=False):
@@ -1563,7 +1949,7 @@ class GradioFrontend:
                             * **Requêtes interlangues** sont supportées mais peuvent avoir une précision réduite
                             """)
                         
-                        with gr.Accordion("⚙️ Méthodes de requête", open=True):
+                        with gr.Accordion("⚙️ Méthodes de requête", open=False):
                             gr.Markdown("""
                             ### Comprendre les méthodes de requête
                             
@@ -1604,16 +1990,16 @@ class GradioFrontend:
                             #### **Impact des paramètres par méthode**
                             
                             **Méthode Standard :**
-                            * ✅ **Chunks à récupérer** : Contrôle le nombre de fragments de documents à rechercher
-                            * ✅ **Température** : Contrôle la créativité de la réponse
-                            * ✅ **Max Tokens** : Contrôle la longueur de la réponse
-                            * ✅ **Modèle** : Contrôle quel LLM utiliser
+                            *  **Chunks à récupérer** : Contrôle le nombre de fragments de documents à rechercher
+                            *  **Température** : Contrôle la créativité de la réponse
+                            *  **Max Tokens** : Contrôle la longueur de la réponse
+                            *  **Modèle** : Contrôle quel LLM utiliser
                             
                             **Méthode Spécifique Excel :**
-                            * ❌ **Chunks à récupérer** : Ignoré (traite TOUTES les données Excel)
-                            * ✅ **Température** : Contrôle la créativité de la réponse
-                            * ✅ **Max Tokens** : Contrôle la longueur de la réponse
-                            * ✅ **Modèle** : Contrôle quel LLM utiliser
+                            *  **Chunks à récupérer** : Ignoré (traite TOUTES les données Excel)
+                            *  **Température** : Contrôle la créativité de la réponse
+                            *  **Max Tokens** : Contrôle la longueur de la réponse
+                            *  **Modèle** : Contrôle quel LLM utiliser
                             
                             #### **Choisir la bonne méthode**
                             
@@ -1660,7 +2046,7 @@ class GradioFrontend:
                             * **Extraction de texte** : Docling (principal) avec fallback pypdf pour les PDFs
                             * **Formats supportés** : PDF, DOCX, XLSX, PPTX, TXT, MD, HTML, XHTML, CSV, PNG, JPEG, TIFF, BMP, WEBP, AsciiDoc, XML
                             * **Dépendances de traitement** : Docling pour les formats complexes, pypdf pour les PDFs imprimés depuis le web, lecture directe pour les fichiers simples
-                            * **Modèle d'embedding** : paraphrase-multilingual-MiniLM-L12-v2 (384 dimensions)
+                            * **Modèle d'embedding** : nomic-embed-text-v2-moe (768 dimensions)
                             * **Base de données vectorielle** : LEANN avec stockage ultra-efficace (97% d'économie d'espace)
                             
                             **Intégration LLM :**
@@ -1738,85 +2124,123 @@ class GradioFrontend:
                             """)
                         
                         with gr.Accordion("🔧 Gestion du système", open=False):
-                            gr.Markdown("""
-                            ### Gérer votre système
-                            
-                            Le système fournit des outils de gestion complets pour maintenir vos collections de documents et index.
-                            
-                            #### **Gestion des documents**
-                            
-                            **Voir les documents :**
-                            * **Liste des documents** : Voir tous les documents téléchargés et traités
-                            * **Informations de statut** : Voir le statut de traitement, le nombre de chunks et la taille des fichiers
-                            * **Supprimer des documents** : Retirer des documents individuels du système
-                            
-                            **Options de téléchargement :**
-                            * **Télécharger et traiter** : Traiter immédiatement les documents pour les requêtes
-                            * **Télécharger seulement** : Stocker les documents sans les traiter
-                            * **Traiter l'existant** : Traiter les documents déjà dans uploads
-                            * **Traiter les téléchargés seulement** : Traiter uniquement les documents non traités
-                            
-                            #### **Maintenance du système**
-                            
-                            **Opérations de réinitialisation (Index seulement) :**
-                            * **Réinitialiser l'index LEANN** : Reconstruit l'index LEANN, préserve toutes les données
-                            * **Réinitialiser LlamaIndex Excel (EXPÉRIMENTAL)** : Reconstruit l'index LlamaIndex, préserve toutes les données
-                            
-                            **Opérations de reconstruction (Rapide, sans retraitement) :**
-                            * **Reconstruire l'index LEANN** : Reconstruit à partir des documents traités existants
-                            * **Reconstruire LlamaIndex Excel (EXPÉRIMENTAL)** : Reconstruit à partir des fichiers Excel traités existants
-                            
-                            **Opérations de suppression (Index + Données) :**
-                            * **Effacer les documents LEANN** : Supprime l'index LEANN + documents non-Excel traités
-                            * **Effacer LlamaIndex Excel (EXPÉRIMENTAL)** : Supprime l'index LlamaIndex + fichiers Excel traités
-                            * **Tout effacer** : Supprime tous les index et toutes les données
-                            
-                            #### **Gestion des magasins vectoriels**
-                            
-                            **Magasin vectoriel LEANN :**
-                            * **Surveillance du statut** : Voir le statut de l'index, le nombre de documents et la taille
-                            * **Informations de l'index** : Voir la configuration et les métriques de performance
-                            * **Actualiser le statut** : Mettre à jour les informations de statut en temps réel
-                            
-                            **Magasin LlamaIndex Excel (EXPÉRIMENTAL) :**
-                            * **Surveillance du statut** : Voir le statut de l'index Excel et le nombre de fichiers
-                            * **Suivi des fichiers Excel** : Surveiller les fichiers Excel téléchargés et traités
-                            * **Actualiser le statut** : Mettre à jour les informations de l'index Excel
-                            * **⚠️ Note** : Le traitement Excel avec LlamaIndex est expérimental
-                            
-                            #### **Informations du système**
-                            
-                            **Gestion des modèles :**
-                            * **Modèles disponibles** : Voir tous les modèles Ollama installés
-                            * **Sélection du modèle** : Choisir le meilleur modèle pour vos besoins
-                            * **Actualiser les modèles** : Mettre à jour la liste des modèles depuis Ollama
-                            
-                            **Statut de traitement :**
-                            * **Surveillance en temps réel** : Voir le statut de traitement actuel
-                            * **Informations de la file** : Voir les tâches de traitement en attente
-                            * **Métriques de performance** : Surveiller les performances du système
-                            
-                            #### **Meilleures pratiques pour la gestion du système**
-                            
-                            **Maintenance régulière :**
-                            * Utilisez les opérations "Reconstruire" pour un rafraîchissement rapide de l'index
-                            * Utilisez les opérations "Réinitialiser" quand les index deviennent corrompus
-                            * Utilisez les opérations "Effacer" seulement quand vous voulez supprimer des données
-                            
-                            **Dépannage :**
-                            * Si les requêtes retournent de mauvais résultats, essayez de reconstruire l'index pertinent
-                            * Si le traitement échoue, vérifiez les logs et essayez de retraiter
-                            * Si des problèmes de mémoire surviennent, effacez les données inutilisées et reconstruisez
-                            
-                            **Sécurité des données :**
-                            * Sauvegardez toujours les documents importants avant les opérations majeures
-                            * Utilisez "Réinitialiser" au lieu de "Effacer" quand possible
-                            * Testez les opérations sur de petits ensembles de données d'abord
-                            """)
+                            gr.Markdown(get_french_guide())
                     
                     # Spanish Guide
                     with gr.Group(visible=False) as spanish_guide:
-                        with gr.Accordion("🎯 Descripción general del sistema", open=True):
+                        with gr.Accordion("🎯 Descripción general del sistema", open=False):
+                            gr.Markdown("""
+                            **Myr-Ag** es un sistema RAG (Retrieval-Augmented Generation) potente que te permite:
+                            
+                            * **Cargar y procesar documentos** en múltiples formatos (PDF, DOCX, XLSX, PPTX, TXT, MD, HTML, XHTML, CSV, PNG, JPEG, TIFF, BMP, WEBP, AsciiDoc, XML)
+                            * **Hacer preguntas** sobre tus documentos en lenguaje natural
+                            * **Obtener respuestas inteligentes** alimentadas por modelos LLM locales
+                            * **Buscar en múltiples documentos** con comprensión semántica
+                            
+                            **Arquitectura de procesamiento dual:**
+                            * **Método Estándar**: Utiliza el almacén vectorial LEANN para documentos generales (PDFs, documentos Word, archivos de texto)
+                            * **Método Específico Excel**: Utiliza LlamaIndex para archivos Excel con procesamiento avanzado de hojas de cálculo (⚠️ EXPERIMENTAL)
+                            
+                            El sistema utiliza procesamiento avanzado de documentos, embeddings vectoriales e inferencia LLM local para proporcionar respuestas precisas y contextuales optimizadas para diferentes tipos de documentos.
+                            """)
+                        
+                        with gr.Accordion(" Gestión de documentos", open=False):
+                            gr.Markdown("""
+                            ### Carga de documentos
+                            
+                            **Formatos soportados:**
+                            
+                            **Documentos de Office:**
+                            * **PDF** : PDFs estándar, PDFs escaneados con OCR, y PDFs impresos desde web
+                            * **DOCX** : Documentos de Microsoft Word
+                            * **XLSX** : Hojas de cálculo de Microsoft Excel (⚠️ EXPERIMENTAL)
+                            * **PPTX** : Presentaciones de Microsoft PowerPoint
+                            
+                            **Contenido Web:**
+                            * **HTML/XHTML** : Páginas web y documentos HTML
+                            
+                            **Formatos de texto:**
+                            * **TXT** : Archivos de texto plano
+                            * **MD** : Documentos Markdown
+                            * **AsciiDoc** : Formato de documentación AsciiDoc
+                            
+                            **Formatos de datos:**
+                            * **CSV** : Archivos de valores separados por comas
+                            
+                            **Formatos de imagen (con OCR):**
+                            * **PNG, JPEG, TIFF, BMP, WEBP** : Imágenes con extracción automática de texto
+                            
+                            **Formatos especializados:**
+                            * **XML** : Lenguaje de marcado extensible
+                            * **USPTO XML** : Documentos de patentes USPTO
+                            * **JATS XML** : Journal Article Tag Suite (artículos científicos)
+                            """)
+                        
+                        with gr.Accordion("🔧 Gestión del sistema", open=False):
+                            gr.Markdown(get_spanish_guide())
+                        
+                        with gr.Accordion("💡 Mejores prácticas", open=False):
+                            gr.Markdown("""
+                            ### Obtener los mejores resultados
+                            
+                            #### **Optimización de consultas**
+                            * **Comienza con preguntas simples** : Construye la comprensión progresivamente
+                            * **Usa términos específicos** : Incluye palabras clave relevantes de tus documentos
+                            * **Haz una pregunta a la vez** : Evita preguntas complejas en múltiples partes
+                            * **Refina según los resultados** : Usa las respuestas iniciales para hacer preguntas de seguimiento más específicas
+                            
+                            #### **Combinaciones de parámetros**
+                            
+                            **Para hechos rápidos:**
+                            * Chunks: 5-10, Temperatura: 0.3, Max Tokens: 500
+                            
+                            **Para análisis detallado:**
+                            * Chunks: 20-30, Temperatura: 0.7, Max Tokens: 3000
+                            
+                            **Para exploración creativa:**
+                            * Chunks: 15-25, Temperatura: 0.9, Max Tokens: 2500
+                            
+                            #### **Estrategias de búsqueda**
+                            
+                            **Búsqueda semántica:**
+                            * **Consulta natural** : "¿Cuáles son los principales hallazgos del estudio?"
+                            * **Términos específicos** : "ROI", "presupuesto", "cronograma"
+                            * **Contexto amplio** : "Análisis financiero del Q3"
+                            
+                            **Búsqueda de Excel:**
+                            * **Preguntas sobre datos** : "¿Cuál es el salario de Juan?"
+                            * **Filtros de datos** : "Muestra todos los empleados de ventas"
+                            * **Análisis de tendencias** : "¿Cómo ha cambiado el rendimiento?"
+                            
+                            #### **Optimización del rendimiento**
+                            
+                            **Configuración de chunks:**
+                            * **Documentos técnicos** : 10-15 chunks para contexto completo
+                            * **Documentos narrativos** : 5-10 chunks para respuestas concisas
+                            * **Hojas de cálculo** : 20-30 chunks para análisis detallado
+                            
+                            **Configuración de temperatura:**
+                            * **Hechos precisos** : 0.1-0.3 para respuestas consistentes
+                            * **Análisis creativo** : 0.7-0.9 para respuestas innovadoras
+                            * **Equilibrio** : 0.5-0.7 para respuestas balanceadas
+                            
+                            #### **Solución de problemas comunes**
+                            
+                            **Respuestas irrelevantes:**
+                            * Ajusta el número de chunks
+                            * Refina la consulta con términos más específicos
+                            * Verifica que los documentos estén correctamente procesados
+                            
+                            **Respuestas incompletas:**
+                            * Aumenta el número máximo de tokens
+                            * Ajusta la temperatura para más creatividad
+                            * Usa consultas de seguimiento más específicas
+                            
+                            **Problemas de rendimiento:**
+                            * Reduce el número de chunks para consultas rápidas
+                            * Usa modelos más pequeños para respuestas más rápidas
+                            * Limpia datos no utilizados regularmente
+                            """)
                             gr.Markdown("""
                             **Myr-Ag** es un potente sistema RAG (Retrieval-Augmented Generation) que te permite:
                             
@@ -1832,7 +2256,7 @@ class GradioFrontend:
                             El sistema utiliza procesamiento avanzado de documentos, embeddings vectoriales e inferencia LLM local para proporcionar respuestas precisas y contextuales optimizadas para diferentes tipos de documentos.
                             """)
                         
-                        with gr.Accordion("📁 Gestión de documentos", open=False):
+                        with gr.Accordion(" Gestión de documentos", open=False):
                             gr.Markdown("""
                             ### Carga de documentos
                             
@@ -1907,10 +2331,10 @@ class GradioFrontend:
                             
                             | Parámetro | Método Estándar | Método Específico Excel |
                             |-----------|-----------------|-------------------------|
-                            | Chunks a recuperar | ✅ Usado (1-40) | ❌ Ignorado (procesa todos los datos) |
-                            | Temperatura | ✅ Usado | ✅ Usado |
-                            | Max Tokens | ✅ Usado | ✅ Usado |
-                            | Selección de modelo | ✅ Usado | ✅ Usado |
+                            | Chunks a recuperar |  Usado (1-40) |  Ignorado (procesa todos los datos) |
+                            | Temperatura |  Usado |  Usado |
+                            | Max Tokens |  Usado |  Usado |
+                            | Selección de modelo |  Usado |  Usado |
                             """)
                         
                         with gr.Accordion("⚙️ Parámetros LLM explicados", open=False):
@@ -2009,7 +2433,7 @@ class GradioFrontend:
                             * **Consultas entre idiomas** son compatibles pero pueden tener precisión reducida
                             """)
                         
-                        with gr.Accordion("⚙️ Métodos de consulta", open=True):
+                        with gr.Accordion("⚙️ Métodos de consulta", open=False):
                             gr.Markdown("""
                             ### Entender los métodos de consulta
                             
@@ -2050,16 +2474,16 @@ class GradioFrontend:
                             #### **Impacto de parámetros por método**
                             
                             **Método Estándar:**
-                            * ✅ **Chunks a recuperar**: Controla cuántos fragmentos de documentos buscar
-                            * ✅ **Temperatura**: Controla la creatividad de la respuesta
-                            * ✅ **Max Tokens**: Controla la longitud de la respuesta
-                            * ✅ **Modelo**: Controla qué LLM usar
+                            *  **Chunks a recuperar**: Controla cuántos fragmentos de documentos buscar
+                            *  **Temperatura**: Controla la creatividad de la respuesta
+                            *  **Max Tokens**: Controla la longitud de la respuesta
+                            *  **Modelo**: Controla qué LLM usar
                             
                             **Método Específico Excel:**
-                            * ❌ **Chunks a recuperar**: Ignorado (procesa TODOS los datos Excel)
-                            * ✅ **Temperatura**: Controla la creatividad de la respuesta
-                            * ✅ **Max Tokens**: Controla la longitud de la respuesta
-                            * ✅ **Modelo**: Controla qué LLM usar
+                            *  **Chunks a recuperar**: Ignorado (procesa TODOS los datos Excel)
+                            *  **Temperatura**: Controla la creatividad de la respuesta
+                            *  **Max Tokens**: Controla la longitud de la respuesta
+                            *  **Modelo**: Controla qué LLM usar
                             
                             #### **Elegir el método correcto**
                             
@@ -2106,7 +2530,7 @@ class GradioFrontend:
                             * **Extracción de texto**: Docling (principal) con respaldo pypdf para PDFs
                             * **Formatos soportados**: PDF, DOCX, XLSX, PPTX, TXT, MD, HTML, XHTML, CSV, PNG, JPEG, TIFF, BMP, WEBP, AsciiDoc, XML
                             * **Dependencias de procesamiento**: Docling para formatos complejos, pypdf para PDFs impresos desde web, lectura directa para archivos simples
-                            * **Modelo de embedding**: paraphrase-multilingual-MiniLM-L12-v2 (384 dimensiones)
+                            * **Modelo de embedding**: nomic-embed-text-v2-moe (768 dimensiones)
                             * **Base de datos vectorial**: LEANN con almacenamiento ultra-eficiente (97% de ahorro de espacio)
                             
                             **Integración LLM:**
@@ -2262,7 +2686,7 @@ class GradioFrontend:
                     
                     # German Guide
                     with gr.Group(visible=False) as german_guide:
-                        with gr.Accordion("🎯 Systemübersicht", open=True):
+                        with gr.Accordion("🎯 Systemübersicht", open=False):
                             gr.Markdown("""
                             **Myr-Ag** ist ein leistungsstarkes RAG (Retrieval-Augmented Generation) System, das Ihnen ermöglicht:
                             
@@ -2278,37 +2702,40 @@ class GradioFrontend:
                             Das System verwendet fortschrittliche Dokumentenverarbeitung, Vektor-Einbettungen und lokale LLM-Inferenz, um präzise und kontextuelle Antworten zu liefern, die für verschiedene Dokumententypen optimiert sind.
                             """)
                         
-                        with gr.Accordion("📁 Dokumentenverwaltung", open=False):
+                        with gr.Accordion(" Dokumentenverwaltung", open=False):
                             gr.Markdown("""
                             ### Dokumenten-Upload
                             
                             **Unterstützte Formate:**
                             
                             **Office-Dokumente:**
-                            * **PDF**: Standard-PDFs, gescannte PDFs mit OCR, und Web-gedruckte PDFs
-                            * **DOCX**: Microsoft Word-Dokumente
-                            * **XLSX**: Microsoft Excel-Tabellenkalkulationen
-                            * **PPTX**: PowerPoint-Präsentationen
+                            * **PDF** : Standard-PDFs, gescannte PDFs mit OCR und Web-gedruckte PDFs
+                            * **DOCX** : Microsoft Word-Dokumente
+                            * **XLSX** : Microsoft Excel-Tabellenkalkulationen (⚠️ EXPERIMENTELL)
+                            * **PPTX** : Microsoft PowerPoint-Präsentationen
                             
-                            **Text und Web:**
-                            * **TXT**: Einfache Textdateien
-                            * **MD**: Markdown-Dateien
-                            * **HTML/XHTML**: Webseiten und strukturierte Dokumente
-                            * **CSV**: Komma-getrennte Wertdateien
+                            **Web-Inhalte:**
+                            * **HTML/XHTML** : Webseiten und HTML-Dokumente
                             
-                            **Bilder (mit OCR):**
-                            * **PNG, JPEG, TIFF, BMP, WEBP**: Gescannte Dokumente und Bilder mit automatischer Textextraktion
+                            **Textformate:**
+                            * **TXT** : Einfache Textdateien
+                            * **MD** : Markdown-Dokumente
+                            * **AsciiDoc** : AsciiDoc-Dokumentationsformat
+                            
+                            **Datenformate:**
+                            * **CSV** : Komma-getrennte Werte-Dateien
+                            
+                            **Bildformate (mit OCR):**
+                            * **PNG, JPEG, TIFF, BMP, WEBP** : Bilder mit automatischer Textextraktion
                             
                             **Spezialisierte Formate:**
-                            * **AsciiDoc**: Technische Dokumentation
-                            * **XML**: Strukturierte Daten und Dokumente
-                            
-                            **Upload-Optionen:**
-                            * **Upload und verarbeiten**: Dokumente sofort hochladen und für Abfragen verarbeiten
-                            * **Nur uploaden**: Dokumente ohne Verarbeitung hochladen (nützlich für Batch-Operationen)
-                            * **Vorhandene verarbeiten**: Dokumente verarbeiten, die bereits im Upload-Verzeichnis sind
-                            * **Nur hochgeladene verarbeiten**: Nur Dokumente verarbeiten, die noch nicht verarbeitet wurden
+                            * **XML** : Erweiterbare Markup-Sprache
+                            * **USPTO XML** : USPTO-Patentdokumente
+                            * **JATS XML** : Journal Article Tag Suite (wissenschaftliche Artikel)
                             """)
+                        
+                        with gr.Accordion("🔧 Systemverwaltung", open=False):
+                            gr.Markdown(get_german_guide())
                         
                         with gr.Accordion("🔍 Abfragemethoden", open=False):
                             gr.Markdown("""
@@ -2353,10 +2780,10 @@ class GradioFrontend:
                             
                             | Parameter | Standard-Methode | Excel-spezifische Methode |
                             |-----------|------------------|---------------------------|
-                            | Zu abrufende Chunks | ✅ Verwendet (1-40) | ❌ Ignoriert (verarbeitet alle Daten) |
-                            | Temperatur | ✅ Verwendet | ✅ Verwendet |
-                            | Max Tokens | ✅ Verwendet | ✅ Verwendet |
-                            | Modellauswahl | ✅ Verwendet | ✅ Verwendet |
+                            | Zu abrufende Chunks |  Verwendet (1-40) |  Ignoriert (verarbeitet alle Daten) |
+                            | Temperatur |  Verwendet |  Verwendet |
+                            | Max Tokens |  Verwendet |  Verwendet |
+                            | Modellauswahl |  Verwendet |  Verwendet |
                             """)
                         
                         with gr.Accordion("⚙️ LLM-Parameter erklärt", open=False):
@@ -2455,7 +2882,7 @@ class GradioFrontend:
                             * **Sprachübergreifende Abfragen** werden unterstützt, können aber reduzierte Genauigkeit haben
                             """)
                         
-                        with gr.Accordion("⚙️ Abfragemethoden", open=True):
+                        with gr.Accordion("⚙️ Abfragemethoden", open=False):
                             gr.Markdown("""
                             ### Abfragemethoden verstehen
                             
@@ -2496,16 +2923,16 @@ class GradioFrontend:
                             #### **Parameterauswirkung nach Methode**
                             
                             **Standard-Methode:**
-                            * ✅ **Chunks abrufen**: Steuert, wie viele Dokumentenfragmente durchsucht werden
-                            * ✅ **Temperatur**: Steuert die Kreativität der Antwort
-                            * ✅ **Max Tokens**: Steuert die Länge der Antwort
-                            * ✅ **Modell**: Steuert, welches LLM verwendet wird
+                            *  **Chunks abrufen**: Steuert, wie viele Dokumentenfragmente durchsucht werden
+                            *  **Temperatur**: Steuert die Kreativität der Antwort
+                            *  **Max Tokens**: Steuert die Länge der Antwort
+                            *  **Modell**: Steuert, welches LLM verwendet wird
                             
                             **Excel-spezifische Methode:**
-                            * ❌ **Chunks abrufen**: Ignoriert (verarbeitet ALLE Excel-Daten)
-                            * ✅ **Temperatur**: Steuert die Kreativität der Antwort
-                            * ✅ **Max Tokens**: Steuert die Länge der Antwort
-                            * ✅ **Modell**: Steuert, welches LLM verwendet wird
+                            *  **Chunks abrufen**: Ignoriert (verarbeitet ALLE Excel-Daten)
+                            *  **Temperatur**: Steuert die Kreativität der Antwort
+                            *  **Max Tokens**: Steuert die Länge der Antwort
+                            *  **Modell**: Steuert, welches LLM verwendet wird
                             
                             #### **Die richtige Methode wählen**
                             
@@ -2552,7 +2979,7 @@ class GradioFrontend:
                             * **Textextraktion**: Docling (primär) mit pypdf-Fallback für PDFs
                             * **Unterstützte Formate**: PDF, DOCX, XLSX, PPTX, TXT, MD, HTML, XHTML, CSV, PNG, JPEG, TIFF, BMP, WEBP, AsciiDoc, XML
                             * **Verarbeitungsabhängigkeiten**: Docling für komplexe Formate, pypdf für Web-gedruckte PDFs, direkte Textlesung für einfache Dateien
-                            * **Embedding-Modell**: paraphrase-multilingual-MiniLM-L12-v2 (384 Dimensionen)
+                            * **Embedding-Modell**: nomic-embed-text-v2-moe (768 Dimensionen)
                             * **Vektor-Datenbank**: LEANN mit ultra-effizienter Speicherung (97% Platzersparnis)
                             
                             **LLM-Integration:**
@@ -2740,20 +3167,38 @@ class GradioFrontend:
             )
             
             delete_doc_btn.click(
-                fn=self.delete_document,
+                fn=self.delete_document_with_dropdown,
                 inputs=doc_dropdown,
-                outputs=[doc_list_output, doc_dropdown, upload_output]
+                outputs=[doc_list_output, doc_dropdown]
             )
             
+            # Domain management button connections
+            refresh_domain_stats_btn.click(
+                fn=self.get_domain_statistics,
+                outputs=domain_stats_output
+            )
+            
+            reset_all_domains_btn.click(
+                fn=self.reset_all_domain_indexes,
+                outputs=domain_stats_output
+            )
+            
+            
+            
+            
+            # Upload with domain selection
             upload_btn.click(
-                fn=self.upload_and_process_documents_with_dropdown,
-                inputs=file_input,
-                outputs=[upload_output, doc_list_output, doc_dropdown]
+                fn=self.upload_and_process_with_domain,
+                inputs=[file_input, upload_domain_selector],
+                outputs=[upload_output, upload_output]
+            ).then(
+                fn=self.refresh_documents_with_dropdown,
+                outputs=[doc_list_output, doc_dropdown]
             )
             
             upload_only_btn.click(
-                fn=self.upload_only_documents_with_dropdown,
-                inputs=file_input,
+                fn=self.upload_only_documents_with_domain,
+                inputs=[file_input, upload_domain_selector],
                 outputs=[upload_output, doc_list_output, doc_dropdown]
             )
             
@@ -2767,8 +3212,24 @@ class GradioFrontend:
                 outputs=upload_output
             )
             
+            # Function to handle query mode changes
+            
+            
+            # Enhanced query function that handles all modes
+            def enhanced_query_documents(question, n_chunks, temperature, max_tokens, model_name, query_mode):
+                if query_mode == "standard":
+                    return self.query_documents(question, n_chunks, temperature, max_tokens, model_name, False, False, None)
+                elif query_mode == "excel":
+                    return self.query_documents(question, n_chunks, temperature, max_tokens, model_name, True, False, None)
+                elif query_mode == "specialized_auto":
+                    return self.query_documents(question, n_chunks, temperature, max_tokens, model_name, False, True, "auto")
+                elif query_mode in ["financial", "legal", "medical", "academic"]:
+                    return self.query_documents(question, n_chunks, temperature, max_tokens, model_name, False, True, query_mode)
+                else:
+                    return self.query_documents(question, n_chunks, temperature, max_tokens, model_name, False, False, None)
+            
             query_btn.click(
-                fn=lambda q, n, t, m, mn, mode: self.query_documents_with_status(q, n, t, m, mn, mode),
+                fn=enhanced_query_documents,
                 inputs=[question_input, n_chunks_input, temperature_input, max_tokens_input, model_selector, query_mode],
                 outputs=[query_output, query_status]
             )
@@ -2787,37 +3248,36 @@ class GradioFrontend:
                 outputs=model_selector
             )
             
-            reset_leann_btn.click(
-                fn=self.reset_index_with_confirmation,
-                inputs=reset_leann_confirm,
+            # Index Management Events
+            index_selector.change(
+                fn=self.update_index_description,
+                inputs=index_selector,
+                outputs=index_description
+            )
+            
+            # Clear Operations Events
+            clear_selector.change(
+                fn=self.update_clear_description,
+                inputs=clear_selector,
+                outputs=clear_description
+            )
+            
+            reset_index_btn.click(
+                fn=self.reset_selected_index,
+                inputs=[index_selector, reset_confirm],
                 outputs=management_output
             )
             
-            rebuild_leann_btn.click(
-                fn=self.rebuild_leann,
+            rebuild_index_btn.click(
+                fn=self.rebuild_selected_index,
+                inputs=index_selector,
                 outputs=management_output
             )
             
-            reset_llamaindex_btn.click(
-                fn=self.reset_llamaindex_with_confirmation,
-                inputs=reset_llamaindex_confirm,
-                outputs=management_output
-            )
-            
-            rebuild_llamaindex_btn.click(
-                fn=self.rebuild_llamaindex,
-                outputs=management_output
-            )
-            
-            clear_leann_btn.click(
-                fn=self.clear_documents_with_confirmation,
-                inputs=clear_leann_confirm,
-                outputs=management_output
-            )
-            
-            clear_all_btn.click(
-                fn=self.clear_all_with_confirmation,
-                inputs=clear_all_confirm,
+            # Clear selected domain button
+            clear_selected_btn.click(
+                fn=self.clear_selected_data,
+                inputs=[clear_selector, clear_confirm],
                 outputs=management_output
             )
             
@@ -2827,11 +3287,6 @@ class GradioFrontend:
                 outputs=llamaindex_info
             )
             
-            clear_llamaindex_btn.click(
-                fn=self.clear_llamaindex_with_confirmation,
-                inputs=clear_llamaindex_confirm,
-                outputs=management_output
-            )
             
             # Initial status check
             interface.load(
@@ -2842,6 +3297,12 @@ class GradioFrontend:
             interface.load(
                 fn=self.list_documents,
                 outputs=doc_list_output
+            )
+            
+            # Initialize dropdowns on page load
+            interface.load(
+                fn=self.refresh_documents_with_dropdown,
+                outputs=[doc_list_output, doc_dropdown]
             )
             
             # Copyright footer

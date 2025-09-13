@@ -4,42 +4,60 @@
 
 ```mermaid
 graph TB
-    subgraph DataDirectory["Data Directory"]
-        DATA["data/"]
-        
-        subgraph Uploads["1. Uploads"]
-            UPLOADS["uploads/"]
-            UPLOADS_DESC["Raw documents<br/>PDF, DOCX, TXT, MD"]
-        end
-        
-        subgraph Processed["2. Processed"]
-            PROCESSED["processed/"]
-            PROCESSED_DESC["Processed documents<br/>JSON with metadata"]
-        end
-        
-        subgraph VectorDB["3. Vector Database"]
-            VECTOR_DB[".leann/"]
-            VECTOR_DB_DESC["LEANN vector database<br/>Ultra-efficient storage"]
-        end
+    subgraph DataDir["Data Directory"]
+        UPLOADS["uploads/<br/>Raw documents"]
+        PROCESSED["processed/<br/>JSON with metadata<br/>+ domain assignment"]
+        LEANN_INDEXES[".leann_*_collection/<br/>Domain-specific indexes<br/>General, Financial, Legal, Medical, Academic, Excel"]
+        EXCEL_INDEX["llamaindex_excel_index/<br/>Excel database"]
     end
-    
-    DATA --> UPLOADS
-    DATA --> PROCESSED
-    UPLOADS --> VECTOR_DB
-    
-    UPLOADS -->|"Raw document"| PROCESSED
-    PROCESSED -->|"Chunks + metadata"| VECTOR_DB
-    
-    classDef mainDir fill:#e3f2fd,stroke:#1565c0,stroke-width:3px
-    classDef uploadDir fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef processedDir fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef vectorDir fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
-    class DATA mainDir
-    class UPLOADS,UPLOADS_DESC uploadDir
-    class PROCESSED,PROCESSED_DESC processedDir
-    class VECTOR_DB,VECTOR_DB_DESC vectorDir
+  
+    UPLOADS -->|"Process with domain"| PROCESSED
+    PROCESSED -->|"Index by domain"| LEANN_INDEXES
+    PROCESSED -->|"Index Excel"| EXCEL_INDEX
+    UPLOADS -->|"Direct domain indexing"| LEANN_INDEXES
+  
+    classDef uploads fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef processed fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef leann fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef excel fill:#fff3e0,stroke:#e65100,stroke-width:2px
+  
+    class UPLOADS uploads
+    class PROCESSED processed
+    class LEANN_INDEXES leann
+    class EXCEL_INDEX excel
 ```
+
+## System Monitoring & Statistics
+
+### Real-Time Statistics
+
+The system now provides comprehensive monitoring and statistics across all domain collections:
+
+- **System Status**: Accurate total documents and chunks across all domains
+- **LEANN Vector Store Management**: Detailed information for all 7 collections (main + 6 domains)
+- **Domain Statistics**: Real-time updates with correct document and chunk counts
+- **Collection Details**: Individual collection status, document count, and chunk count
+- **Summary Statistics**: Aggregated totals across all collections
+
+### Collection Structure
+
+```text
+System Collections:
+├── main_collection (General domain)
+├── financial_collection (Financial domain)
+├── legal_collection (Legal domain)
+├── medical_collection (Medical domain)
+├── academic_collection (Academic domain)
+└── excel_collection (Excel domain)
+```
+
+Each collection maintains its own:
+
+- Vector index files
+- Document metadata
+- Chunk counts
+- Processing status
+- Performance metrics
 
 ## Detail of Each Directory
 
@@ -47,7 +65,6 @@ graph TB
 
 ```
 data/uploads/
-├── (vide actuellement)
 └── (futurs documents PDF, DOCX, TXT, MD)
 ```
 
@@ -68,6 +85,7 @@ data/uploads/
 - User uploads documents via the web interface
 - Files are temporarily stored here
 - The system processes these files then moves them to `processed/`
+- **Domain Indexing**: Use "Index Documents by Domain" to process documents with specific domain assignment
 
 ---
 
@@ -75,7 +93,6 @@ data/uploads/
 
 ```
 data/processed/
-├── (vide actuellement)
 └── (futurs fichiers JSON traités)
 ```
 
@@ -87,6 +104,7 @@ data/processed/
 - Document metadata (name, size, processing date)
 - Text chunks with positions and sizes
 - Information about the extraction process
+- **Domain assignment** for specialized processing
 
 **Structure of a processed JSON file:**
 
@@ -98,6 +116,7 @@ data/processed/
   "file_extension": ".pdf",
   "content_length": 2891,
   "chunk_count": 150,
+  "domain": "financial",
   "processing_timestamp": "2025-08-30T15:03:17.107",
   "chunks": [
     {
@@ -154,6 +173,7 @@ Excel files receive enhanced processing with specialized chunking:
 ```
 
 **Excel Chunking Features:**
+
 - **Row-based chunks**: Each row becomes a searchable chunk
 - **Column-aware processing**: Automatic detection of amounts, names, dates
 - **Natural language descriptions**: "Employee: John Doe | Salary: 50000"
@@ -162,16 +182,54 @@ Excel files receive enhanced processing with specialized chunking:
 
 ---
 
-### 3. **`.leann/`** - LEANN Vector Database
+### 3. **Vector Databases** - Domain-Specific Indexes
+
+#### 3.1 General LEANN Index
 
 ```
-.leann/
-├── indexes/                          # LEANN index directory
-│   └── main_collection/              # Main index directory
-│       ├── main_collection.index     # HNSW index file
-│       ├── main_collection.meta.json # Metadata
-│       ├── main_collection.passages.idx # Passages index
-│       └── main_collection.passages.jsonl # Passages data
+.leann_main_collection/
+├── main_collection.index             # HNSW index file
+├── main_collection.meta.json         # Metadata
+├── main_collection.passages.idx      # Passages index
+└── main_collection.passages.jsonl    # Passages data
+```
+
+#### 3.2 Domain-Specific LEANN Indexes
+
+```
+.leann_financial_collection/          # Financial domain index
+├── financial_collection.index
+├── financial_collection.meta.json
+├── financial_collection.passages.idx
+└── financial_collection.passages.jsonl
+
+.leann_legal_collection/              # Legal domain index
+├── legal_collection.index
+├── legal_collection.meta.json
+├── legal_collection.passages.idx
+└── legal_collection.passages.jsonl
+
+.leann_medical_collection/            # Medical domain index
+├── medical_collection.index
+├── medical_collection.meta.json
+├── medical_collection.passages.idx
+└── medical_collection.passages.jsonl
+
+.leann_academic_collection/           # Academic domain index
+├── academic_collection.index
+├── academic_collection.meta.json
+├── academic_collection.passages.idx
+└── academic_collection.passages.jsonl
+```
+
+#### 3.3 Excel LlamaIndex Database
+
+```
+data/llamaindex_excel_index/
+├── index.json                        # LlamaIndex configuration
+├── docstore.json                     # Document store
+├── index_store.json                  # Index store
+└── vector_store.json                 # Vector store
 ```
 
 **Role:** Ultra-efficient storage of vector embeddings and metadata for semantic search
@@ -186,42 +244,133 @@ Excel files receive enhanced processing with specialized chunking:
   - Relationships between chunks and documents
   - Searcher configuration files for initialization
 
-
 ---
 
 ## Complete Data Flow
+
+### General Documents Flow (PDF, DOCX, TXT, MD, etc.)
 
 ```mermaid
 flowchart LR
     subgraph Upload["1. Upload"]
         A["PDF/DOCX Document"] --> B["uploads/"]
     end
-    
+  
     subgraph Processing["2. Processing"]
         B --> C["Text extraction<br/>Docling"]
         C --> D["Chunking<br/>400 chars<br/>Sentence-based"]
         D --> E["processed/"]
     end
-    
+  
     subgraph Vectorization["3. Vectorization"]
-        E --> F["Embedding generation<br/>paraphrase-multilingual-MiniLM-L12-v2"]
+        E --> F["Embedding generation<br/>nomic-embed-text-v2-moe"]
         F --> G["LEANN Index<br/>Ultra-efficient storage"]
     end
-    
+  
     subgraph Search["4. Search"]
         G --> H["Semantic search<br/>Vector similarity"]
         H --> I["RAG response<br/>Ollama LLM"]
     end
-    
+  
     classDef uploadStep fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
     classDef processStep fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef vectorStep fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef searchStep fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
+  
     class A,B uploadStep
     class C,D,E processStep
     class F,G vectorStep
     class H,I searchStep
+```
+
+### Excel Documents Flow (XLSX)
+
+```mermaid
+flowchart LR
+    subgraph Upload["1. Upload"]
+        A1["Excel File (.xlsx)"] --> B1["uploads/"]
+    end
+  
+    subgraph Processing["2. Excel Processing"]
+        B1 --> C1["Excel parsing<br/>LlamaIndex"]
+        C1 --> D1["Row-based chunking<br/>Natural language descriptions"]
+        D1 --> E1["processed/"]
+    end
+  
+    subgraph Vectorization["3. Vectorization"]
+        E1 --> F1["Embedding generation<br/>LlamaIndex embeddings"]
+        F1 --> G1["LlamaIndex Database<br/>data/llamaindex_excel_index/"]
+    end
+  
+    subgraph Search["4. Search"]
+        G1 --> H1["Excel-specific search<br/>Row/column queries"]
+        H1 --> I1["RAG response<br/>Ollama LLM"]
+    end
+  
+    classDef uploadStep fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef processStep fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef vectorStep fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef searchStep fill:#fff3e0,stroke:#e65100,stroke-width:2px
+  
+    class A1,B1 uploadStep
+    class C1,D1,E1 processStep
+    class F1,G1 vectorStep
+    class H1,I1 searchStep
+```
+
+### Combined Data Flow with Domain Routing
+
+```mermaid
+flowchart TB
+    subgraph Upload["1. Upload & Domain Selection"]
+        A["Document Upload"] --> B["Domain Selection<br/>General, Financial, Legal, Medical, Academic"]
+        B --> C["uploads/"]
+    end
+  
+    subgraph Processing["2. Processing"]
+        C --> D{Document Type?}
+        D -->|PDF, DOCX, TXT, MD| E["Docling Processing"]
+        D -->|XLSX| F["LlamaIndex Processing"]
+        E --> G["Standard Chunking<br/>400 chars"]
+        F --> H["Excel Chunking<br/>Row-based"]
+        G --> I["processed/"]
+        H --> I
+    end
+  
+    subgraph Vectorization["3. Domain-Specific Vectorization"]
+        I --> J{Domain Assignment}
+        J -->|General| K[".leann_main_collection/"]
+        J -->|Financial| L[".leann_financial_collection/"]
+        J -->|Legal| M[".leann_legal_collection/"]
+        J -->|Medical| N[".leann_medical_collection/"]
+        J -->|Academic| O[".leann_academic_collection/"]
+        J -->|Excel| P["data/llamaindex_excel_index/"]
+    end
+  
+    subgraph Search["4. Domain-Specific Search"]
+        K --> Q["General Search"]
+        L --> R["Financial Search"]
+        M --> S["Legal Search"]
+        N --> T["Medical Search"]
+        O --> U["Academic Search"]
+        P --> V["Excel Search"]
+        Q --> W["RAG Response<br/>Ollama LLM"]
+        R --> W
+        S --> W
+        T --> W
+        U --> W
+        V --> W
+    end
+  
+    classDef uploadStep fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef processStep fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef vectorStep fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef searchStep fill:#fff3e0,stroke:#e65100,stroke-width:2px
+  
+    class A,B,C uploadStep
+    class D,E,F,G,H,I processStep
+    class J,K,L,M,N,O,P vectorStep
+    class Q,R,S,T,U,V,W searchStep
 ```
 
 ## Key Points to Understand
@@ -244,12 +393,20 @@ flowchart LR
 - Processed documents are compressed in JSON
 - LEANN automatically manages vector optimization and pruning
 
+### **Domain Management:**
+
+- **Domain-Specific Indexes**: Each domain has its own isolated vector index
+- **User-Controlled Assignment**: Documents are assigned to domains by user selection
+- **Isolated Operations**: Reset, rebuild, or clear individual domains independently
+- **Query Routing**: Queries are routed to the appropriate domain index
+
 ### **Maintenance Operations:**
 
-- **Reset Index** : Clears only `.leann/` index
-- **Clear Documents** : Clears `uploads/` and `processed/`
-- **Clear All** : Clears all directories
-- **Force Searcher Init** : Reinitializes LEANN searcher if initialization fails
+- **Reset Index** : Clears only selected domain index
+- **Rebuild Index** : Rebuilds selected domain from processed documents
+- **Clear Domain** : Clears selected domain index + domain documents
+- **Clear All** : Clears all indexes and all data
+- **Bulk Operations** : Reset/rebuild all domains at once
 - **Reprocess Documents** : Rebuilds index from existing processed documents
 
 ---

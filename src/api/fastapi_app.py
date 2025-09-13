@@ -6,7 +6,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Query, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -25,6 +25,7 @@ from src.vector_db.unified_vector_store import UnifiedVectorStore, unified_manag
 from src.llm_integration.ollama_client import OllamaClient
 from src.llm_integration.rag_pipeline import RAGPipeline
 from src.llm_integration.enhanced_rag_pipeline import EnhancedRAGPipeline
+from src.llm_integration.enhanced_rag_with_pipelines import EnhancedRAGWithPipelines
 
 
 # Pydantic models for API requests/responses
@@ -67,6 +68,7 @@ class DocumentInfo(BaseModel):
     content_length: int
     chunk_count: int
     processing_timestamp: str
+    domain: Optional[str] = None
 
 
 class FastAPIBackend:
@@ -130,7 +132,14 @@ class FastAPIBackend:
                 enable_llamaindex=True
             )
             
-            logger.info(f"All system components initialized successfully with LEANN + LlamaIndex for Excel")
+            # Initialize enhanced RAG pipeline with specialized pipelines
+            self.specialized_rag_pipeline = EnhancedRAGWithPipelines(
+                self.indexer,
+                self.ollama_client,
+                Path(settings.DATA_DIR)
+            )
+            
+            logger.info(f"All system components initialized successfully with LEANN + LlamaIndex for Excel + Specialized Pipelines")
             
         except Exception as e:
             logger.error(f"Error initializing components: {e}")
@@ -138,6 +147,7 @@ class FastAPIBackend:
     
     def _setup_routes(self):
         """Setup API routes."""
+        from src.utils.device_manager import device_manager, get_mps_info
         
         @self.app.get("/")
         async def root():
@@ -161,6 +171,32 @@ class FastAPIBackend:
             except Exception as e:
                 return {"status": "error", "error": str(e)}
         
+        @self.app.get("/system/mps-info")
+        async def get_mps_info_endpoint():
+            """Get MPS device information and performance metrics."""
+            try:
+                mps_info = get_mps_info()
+                return {
+                    "status": "success",
+                    "mps_info": mps_info,
+                    "timestamp": datetime.now().isoformat()
+                }
+            except Exception as e:
+                return {"status": "error", "error": str(e)}
+        
+        @self.app.post("/system/cleanup-mps")
+        async def cleanup_mps_memory():
+            """Clean up MPS memory."""
+            try:
+                device_manager.cleanup_memory("mps")
+                return {
+                    "status": "success",
+                    "message": "MPS memory cleaned successfully",
+                    "timestamp": datetime.now().isoformat()
+                }
+            except Exception as e:
+                return {"status": "error", "error": str(e)}
+        
         @self.app.get("/system/info", response_model=SystemInfo)
         async def get_system_info():
             """Get system information."""
@@ -172,13 +208,17 @@ class FastAPIBackend:
                 uploads_dir = Path(settings.DATA_DIR) / "uploads"
                 total_documents = len([f for f in uploads_dir.iterdir() if f.is_file()]) if uploads_dir.exists() else 0
                 
+                # Get total chunks from all domains
+                domain_stats = self.specialized_rag_pipeline.get_domain_statistics()
+                total_chunks = sum(domain_info.get("chunk_count", 0) for domain_info in domain_stats.values() if "error" not in domain_info)
+                
                 return SystemInfo(
                     ollama_health=pipeline_info.get("ollama_health", False),
                     available_models=pipeline_info.get("available_models", []),
                     default_model=pipeline_info.get("default_model", "unknown"),
                     index_info=index_info,
                     total_documents=total_documents,
-                    total_chunks=index_info.get("total_chunks", 0)
+                    total_chunks=total_chunks
                 )
             except Exception as e:
                 logger.error(f"Error getting system info: {e}")
@@ -197,11 +237,22 @@ class FastAPIBackend:
                 # First, collect all processed documents
                 if processed_dir.exists():
                     for file_path in processed_dir.iterdir():
-                        if file_path.is_file() and file_path.suffix.lower() == ".json":
+                        if file_path.is_file() and file_path.suffix.lower() == ".json" and file_path.name.endswith("_processed.json"):
                             try:
                                 import json
                                 with open(file_path, 'r', encoding='utf-8') as f:
                                     doc_data = json.load(f)
+                                
+                                # Get domain from the corresponding metadata file
+                                metadata_file = processed_dir / f"{file_path.stem.replace('_processed', '')}.json"
+                                domain = "general"  # default
+                                if metadata_file.exists():
+                                    try:
+                                        with open(metadata_file, 'r', encoding='utf-8') as f:
+                                            metadata = json.load(f)
+                                        domain = metadata.get('domain', 'general')
+                                    except Exception as e:
+                                        logger.warning(f"Error reading domain from {metadata_file}: {e}")
                                 
                                 # Get original file info from the processed data
                                 original_file_path = doc_data.get('file_path', '')
@@ -218,7 +269,8 @@ class FastAPIBackend:
                                             file_extension=original_file.suffix.lower(),
                                             content_length=doc_data.get('content_length', 0),
                                             chunk_count=doc_data.get('metadata', {}).get('chunk_count', 0),
-                                            processing_timestamp=doc_data.get('metadata', {}).get('processing_timestamp', '')
+                                            processing_timestamp=doc_data.get('metadata', {}).get('processing_timestamp', ''),
+                                            domain=domain
                                         ))
                                     else:
                                         logger.warning(f"Original file not found: {original_file_path}")
@@ -241,7 +293,8 @@ class FastAPIBackend:
                                     file_extension=file_path.suffix.lower(),
                                     content_length=0,
                                     chunk_count=0,  # Not processed yet
-                                    processing_timestamp=""
+                                    processing_timestamp="",
+                                    domain="general"  # Default domain for unprocessed documents
                                 ))
                             except Exception as e:
                                 logger.warning(f"Error processing file {file_path}: {e}")
@@ -284,7 +337,7 @@ class FastAPIBackend:
                             logger.error(f"Error uploading file {file.filename}: {e}")
                             continue
                 
-                # Process uploaded documents
+                # Process uploaded documents using the general indexer (for backward compatibility)
                 processed_count = self.indexer.index_directory(uploads_dir)
                 
                 return {
@@ -332,6 +385,97 @@ class FastAPIBackend:
                 
             except Exception as e:
                 logger.error(f"Error uploading documents: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/documents/upload-with-domain")
+        async def upload_documents_with_domain(files: List[UploadFile] = File(...), domain: str = Form("general")):
+            """Upload documents and process them in a specific domain."""
+            try:
+                if not files:
+                    raise HTTPException(status_code=400, detail="No files provided")
+                
+                uploads_dir = Path(settings.DATA_DIR) / "uploads"
+                uploads_dir.mkdir(parents=True, exist_ok=True)
+                
+                uploaded_files = []
+                processed_count = 0
+                
+                for file in files:
+                    if file.filename:
+                        # Save uploaded file
+                        file_path = uploads_dir / file.filename
+                        try:
+                            # Read file content and save it
+                            content = await file.read()
+                            with open(file_path, "wb") as buffer:
+                                buffer.write(content)
+                            
+                            uploaded_files.append(str(file_path))
+                            logger.info(f"Successfully uploaded file: {file.filename}")
+                            
+                            # Process the document in the specified domain
+                            success, message = self.specialized_rag_pipeline.index_document(file_path, domain)
+                            if success:
+                                processed_count += 1
+                                logger.info(f"Successfully processed {file.filename} in {domain} domain")
+                            else:
+                                logger.warning(f"Failed to process {file.filename} in {domain} domain: {message}")
+                                
+                        except Exception as e:
+                            logger.error(f"Error uploading file {file.filename}: {e}")
+                            continue
+                
+                return {
+                    "message": f"Successfully uploaded and processed {processed_count}/{len(uploaded_files)} documents in {domain} domain",
+                    "uploaded_files": uploaded_files,
+                    "processed_count": processed_count,
+                    "domain": domain
+                }
+                
+            except Exception as e:
+                logger.error(f"Error uploading documents with domain: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/documents/upload-only-with-domain")
+        async def upload_only_documents_with_domain(files: List[UploadFile] = File(...), domain: str = Form("general")):
+            """Upload documents without processing them, but store domain metadata."""
+            try:
+                if not files:
+                    raise HTTPException(status_code=400, detail="No files provided")
+                
+                uploads_dir = Path(settings.DATA_DIR) / "uploads"
+                uploads_dir.mkdir(parents=True, exist_ok=True)
+                
+                uploaded_files = []
+                for file in files:
+                    if file.filename:
+                        # Save uploaded file
+                        file_path = uploads_dir / file.filename
+                        try:
+                            # Read file content and save it
+                            content = await file.read()
+                            with open(file_path, "wb") as buffer:
+                                buffer.write(content)
+                            
+                            uploaded_files.append(str(file_path))
+                            logger.info(f"Successfully uploaded file: {file.filename}")
+                            
+                            # Store domain metadata for the uploaded file
+                            self.specialized_rag_pipeline.pipeline_manager.domain_manager._store_domain_metadata(file_path, domain)
+                            logger.info(f"Stored domain metadata for {file.filename}: {domain}")
+                                
+                        except Exception as e:
+                            logger.error(f"Error uploading file {file.filename}: {e}")
+                            continue
+                
+                return {
+                    "message": f"Successfully uploaded {len(uploaded_files)} documents with domain {domain}",
+                    "uploaded_files": uploaded_files,
+                    "domain": domain
+                }
+                
+            except Exception as e:
+                logger.error(f"Error uploading documents with domain: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
         @self.app.post("/documents/process")
@@ -498,7 +642,300 @@ class FastAPIBackend:
                 logger.error(f"Error processing enhanced query: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.delete("/system/reset-index")
+        @self.app.post("/query-specialized")
+        async def query_documents_specialized(request: QueryRequest):
+            """Query documents using specialized domain pipelines with auto-detection."""
+            try:
+                logger.info(f"Processing specialized RAG query: {request.question}")
+                
+                # Change model if specified
+                if request.model and request.model != self.ollama_client.current_model:
+                    self.ollama_client.switch_model(request.model)
+                
+                # Execute specialized RAG query with auto-detection
+                response = self.specialized_rag_pipeline.query(
+                    question=request.question,
+                    n_chunks=request.n_chunks,
+                    interaction_mode="precise_question"
+                )
+                
+                return {
+                    "question": response.query,
+                    "answer": response.answer,
+                    "confidence_score": response.confidence_score,
+                    "processing_time": response.processing_time,
+                    "sources": response.sources,
+                    "pipeline_used": response.pipeline_used,
+                    "domain": response.domain,
+                    "enhanced_query": response.enhanced_query,
+                    "metadata": response.metadata
+                }
+                
+            except Exception as e:
+                logger.error(f"Error processing specialized query: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/query-specialized/{domain}")
+        async def query_documents_specific_pipeline(domain: str, request: QueryRequest):
+            """Query documents using a specific specialized pipeline."""
+            try:
+                logger.info(f"Processing {domain} pipeline query: {request.question}")
+                
+                # Change model if specified
+                if request.model and request.model != self.ollama_client.current_model:
+                    self.ollama_client.switch_model(request.model)
+                
+                # Execute specialized RAG query with specific pipeline
+                response = self.specialized_rag_pipeline.query_with_specific_pipeline(
+                    question=request.question,
+                    domain=domain,
+                    n_chunks=request.n_chunks,
+                    interaction_mode="precise_question"
+                )
+                
+                return {
+                    "question": response.query,
+                    "answer": response.answer,
+                    "confidence_score": response.confidence_score,
+                    "processing_time": response.processing_time,
+                    "sources": response.sources,
+                    "pipeline_used": response.pipeline_used,
+                    "domain": response.domain,
+                    "enhanced_query": response.enhanced_query,
+                    "metadata": response.metadata
+                }
+                
+            except Exception as e:
+                logger.error(f"Error processing {domain} pipeline query: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.get("/pipelines")
+        async def list_pipelines():
+            """List all available specialized pipelines."""
+            try:
+                pipelines = self.specialized_rag_pipeline.list_available_pipelines()
+                return {
+                    "available_pipelines": pipelines,
+                    "auto_detection_enabled": self.specialized_rag_pipeline.auto_detect_pipeline
+                }
+            except Exception as e:
+                logger.error(f"Error listing pipelines: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.get("/pipelines/{domain}/info")
+        async def get_pipeline_info(domain: str):
+            """Get information about a specific pipeline."""
+            try:
+                info = self.specialized_rag_pipeline.get_pipeline_info(domain)
+                return info
+            except Exception as e:
+                logger.error(f"Error getting pipeline info for {domain}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/pipelines/test-detection")
+        async def test_pipeline_detection(request: dict):
+            """Test pipeline detection with sample queries."""
+            try:
+                test_queries = request.get("queries", [])
+                if not test_queries:
+                    raise HTTPException(status_code=400, detail="No queries provided")
+                
+                results = self.specialized_rag_pipeline.test_pipeline_detection(test_queries)
+                return {"detection_results": results}
+                
+            except Exception as e:
+                logger.error(f"Error testing pipeline detection: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/documents/index-domain")
+        async def index_document_domain(request: dict):
+            """Index a document in a specific domain."""
+            try:
+                file_path = request.get("file_path")
+                force_domain = request.get("force_domain")
+                
+                if not file_path:
+                    raise HTTPException(status_code=400, detail="file_path is required")
+                
+                file_path = Path(file_path)
+                if not file_path.exists():
+                    raise HTTPException(status_code=404, detail="File not found")
+                
+                success, message = self.specialized_rag_pipeline.index_document(file_path, force_domain)
+                
+                return {
+                    "success": success,
+                    "message": message,
+                    "file_path": str(file_path),
+                    "domain": force_domain or "auto-detected"
+                }
+                
+            except Exception as e:
+                logger.error(f"Error indexing document in domain: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/documents/index-directory-domain")
+        async def index_directory_domain(request: dict):
+            """Index all documents in a directory, routing to appropriate domains."""
+            try:
+                directory_path = request.get("directory_path")
+                force_domain = request.get("force_domain")
+                
+                if not directory_path:
+                    raise HTTPException(status_code=400, detail="directory_path is required")
+                
+                directory_path = Path(directory_path)
+                if not directory_path.exists():
+                    raise HTTPException(status_code=404, detail="Directory not found")
+                
+                results = self.specialized_rag_pipeline.index_directory(directory_path, force_domain)
+                
+                return {
+                    "success": True,
+                    "message": f"Indexed documents in {len(results)} domains",
+                    "directory_path": str(directory_path),
+                    "domain_results": results
+                }
+                
+            except Exception as e:
+                logger.error(f"Error indexing directory in domains: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.get("/domains/statistics")
+        async def get_domain_statistics():
+            """Get statistics for all domain indexes."""
+            try:
+                stats = self.specialized_rag_pipeline.get_domain_statistics()
+                return stats
+                
+            except Exception as e:
+                logger.error(f"Error getting domain statistics: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/domains/{domain}/reset")
+        async def reset_domain_index(domain: str):
+            """Reset a specific domain index."""
+            try:
+                success = self.specialized_rag_pipeline.reset_domain_index(domain)
+                
+                if success:
+                    return {"message": f"Domain '{domain}' index reset successfully"}
+                else:
+                    raise HTTPException(status_code=500, detail=f"Failed to reset domain '{domain}' index")
+                    
+            except Exception as e:
+                logger.error(f"Error resetting domain {domain} index: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/domains/{domain}/rebuild")
+        async def rebuild_domain_index(domain: str):
+            """Rebuild a specific domain index."""
+            try:
+                success = self.specialized_rag_pipeline.rebuild_domain_index(domain)
+                
+                if success:
+                    return {"message": f"Domain '{domain}' index rebuilt successfully"}
+                else:
+                    raise HTTPException(status_code=500, detail=f"Failed to rebuild domain '{domain}' index")
+                    
+            except Exception as e:
+                logger.error(f"Error rebuilding domain {domain} index: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/domains/reset-all")
+        async def reset_all_domain_indexes():
+            """Reset all domain indexes."""
+            try:
+                results = self.specialized_rag_pipeline.reset_all_domain_indexes()
+                
+                return {
+                    "message": "Domain indexes reset completed",
+                    "results": results
+                }
+                
+            except Exception as e:
+                logger.error(f"Error resetting all domain indexes: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/domains/rebuild-all")
+        async def rebuild_all_domain_indexes():
+            """Rebuild all domain indexes."""
+            try:
+                results = self.specialized_rag_pipeline.rebuild_all_domain_indexes()
+                
+                return {
+                    "message": "Domain indexes rebuild completed",
+                    "results": results
+                }
+                
+            except Exception as e:
+                logger.error(f"Error rebuilding all domain indexes: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.post("/system/rebuild-all")
+        async def rebuild_all_indexes():
+            """Rebuild ALL indexes: general + specialized domains + excel."""
+            try:
+                results = {}
+                
+                # 1. Rebuild general LEANN index
+                try:
+                    general_success = self.indexer.rebuild_leann_index()
+                    results["general"] = general_success
+                except Exception as e:
+                    logger.error(f"Error rebuilding general index: {e}")
+                    results["general"] = False
+                
+                # 2. Rebuild all specialized domain indexes
+                try:
+                    domain_results = self.specialized_rag_pipeline.rebuild_all_domain_indexes()
+                    results.update(domain_results)
+                except Exception as e:
+                    logger.error(f"Error rebuilding domain indexes: {e}")
+                    results["domains"] = False
+                
+                # 3. Rebuild LlamaIndex Excel
+                try:
+                    from src.document_processing.llamaindex_persistent_processor import LlamaIndexExcelProcessor
+                    llamaindex_processor = LlamaIndexExcelProcessor()
+                    excel_success = llamaindex_processor.rebuild_index_from_processed_files()
+                    results["excel"] = excel_success
+                except Exception as e:
+                    logger.error(f"Error rebuilding Excel index: {e}")
+                    results["excel"] = False
+                
+                # Count successes
+                success_count = sum(1 for success in results.values() if success)
+                total_count = len(results)
+                
+                return {
+                    "message": f"All indexes rebuild completed ({success_count}/{total_count} successful)",
+                    "results": results
+                }
+                
+            except Exception as e:
+                logger.error(f"Error rebuilding all indexes: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        
+        @self.app.get("/documents/{file_name}/domain")
+        async def get_document_domain(file_name: str):
+            """Get the current domain of a document."""
+            try:
+                # Use the domain manager to get document domain
+                domain = self.specialized_rag_pipeline.pipeline_manager.domain_manager.get_document_domain(file_name)
+                
+                return {
+                    "file_name": file_name,
+                    "current_domain": domain
+                }
+                
+            except Exception as e:
+                logger.error(f"Error getting document domain: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        
+        @self.app.post("/system/reset-index")
         async def reset_index():
             """Reset only the LEANN vector index (preserves all processed documents and uploads)."""
             try:
@@ -549,8 +986,8 @@ class FastAPIBackend:
                 logger.error(f"Error clearing documents: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.post("/system/rebuild-leann")
-        async def rebuild_leann():
+        @self.app.post("/system/rebuild-index")
+        async def rebuild_index():
             """Rebuild LEANN index from existing processed documents (no reprocessing)."""
             try:
                 # Rebuild LEANN index from existing processed documents
@@ -584,7 +1021,7 @@ class FastAPIBackend:
                 logger.error(f"Error rebuilding LlamaIndex: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.delete("/system/reset-llamaindex")
+        @self.app.post("/system/reset-llamaindex")
         async def reset_llamaindex():
             """Reset only the LlamaIndex Excel index (preserves all processed Excel files and uploads)."""
             try:
@@ -726,7 +1163,7 @@ class FastAPIBackend:
                             except Exception:
                                 continue
                 
-                if (not original_file or not original_file.exists()) and not processed_file_exists:
+                if (original_file is None or not original_file.exists()) and not processed_file_exists:
                     raise HTTPException(status_code=404, detail=f"Document '{file_name}' not found")
                 
                 # Find the processed file (we already searched above)
@@ -871,15 +1308,55 @@ class FastAPIBackend:
         
         @self.app.get("/system/vector-store")
         async def get_vector_store_info():
-            """Get information about the LEANN vector store."""
+            """Get information about all LEANN vector stores."""
             try:
-                store_info = self.vector_store.get_collection_info()
-                store_info.update({
+                # Get main collection info
+                main_store_info = self.vector_store.get_collection_info()
+                main_store_info.update({
                     "store_type": "LEANN",
                     "is_leann": True,
                     "use_leann_setting": True
                 })
-                return store_info
+                
+                # Get domain statistics for all collections
+                domain_stats = self.specialized_rag_pipeline.get_domain_statistics()
+                
+                # Create comprehensive store info
+                all_stores = {
+                    "main_collection": main_store_info,
+                    "domain_collections": {}
+                }
+                
+                # Add domain collection info
+                for domain, stats in domain_stats.items():
+                    if "error" not in stats:
+                        all_stores["domain_collections"][domain] = {
+                            "index_name": f"{domain}_collection",
+                            "document_count": stats.get("document_count", 0),
+                            "chunk_count": stats.get("chunk_count", 0),
+                            "is_initialized": stats.get("is_initialized", False),
+                            "store_type": "LEANN",
+                            "is_leann": True,
+                            "use_leann_setting": True
+                        }
+                
+                # Calculate totals
+                total_documents = main_store_info.get("document_count", 0) + sum(
+                    stats.get("document_count", 0) for stats in all_stores["domain_collections"].values()
+                )
+                total_chunks = main_store_info.get("chunk_count", 0) + sum(
+                    stats.get("chunk_count", 0) for stats in all_stores["domain_collections"].values()
+                )
+                
+                all_stores["summary"] = {
+                    "total_collections": 1 + len(all_stores["domain_collections"]),
+                    "total_documents": total_documents,
+                    "total_chunks": total_chunks,
+                    "embedding_model": main_store_info.get("embedding_model", "unknown"),
+                    "backend": main_store_info.get("backend", "unknown")
+                }
+                
+                return all_stores
             except Exception as e:
                 logger.error(f"Error getting LEANN vector store info: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
@@ -913,6 +1390,98 @@ class FastAPIBackend:
                 logger.error(f"Error clearing all data: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
+        @self.app.delete("/system/clear-general")
+        async def clear_general():
+            """Clear general LEANN index and all processed documents."""
+            try:
+                # Reset general LEANN index
+                self.indexer.reset_index()
+                
+                # Clear all processed documents
+                processed_dir = Path(settings.DATA_DIR) / "processed"
+                files_deleted = []
+                if processed_dir.exists():
+                    for file_path in processed_dir.iterdir():
+                        if file_path.is_file():
+                            file_path.unlink()
+                            files_deleted.append(file_path.name)
+                
+                return {"message": f"General index cleared: {len(files_deleted)} processed files deleted"}
+                
+            except Exception as e:
+                logger.error(f"Error clearing general index: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.delete("/system/clear-domain/{domain}")
+        async def clear_domain(domain: str):
+            """Clear specific domain index and its processed documents."""
+            try:
+                # Reset domain index
+                success = self.specialized_rag_pipeline.reset_domain_index(domain)
+                if not success:
+                    raise HTTPException(status_code=500, detail=f"Failed to reset {domain} domain index")
+                
+                # Clear domain-specific processed documents
+                processed_dir = Path(settings.DATA_DIR) / "processed"
+                files_deleted = []
+                if processed_dir.exists():
+                    for file_path in processed_dir.iterdir():
+                        if file_path.is_file() and file_path.suffix.lower() == ".json":
+                            try:
+                                import json
+                                with open(file_path, 'r', encoding='utf-8') as f:
+                                    doc_data = json.load(f)
+                                
+                                # Check if document belongs to this domain
+                                doc_domain = doc_data.get('domain', 'general')
+                                if doc_domain == domain:
+                                    file_path.unlink()
+                                    files_deleted.append(file_path.name)
+                            except Exception as e:
+                                logger.warning(f"Could not read domain from {file_path}: {e}")
+                                continue
+                
+                return {"message": f"{domain.title()} domain cleared: {len(files_deleted)} processed files deleted"}
+                
+            except Exception as e:
+                logger.error(f"Error clearing {domain} domain: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.delete("/system/clear-excel")
+        async def clear_excel():
+            """Clear Excel index and processed Excel files."""
+            try:
+                # Clear LlamaIndex Excel index
+                excel_index_path = Path("data/llamaindex_excel_index")
+                if excel_index_path.exists():
+                    shutil.rmtree(excel_index_path)
+                    excel_index_path.mkdir(exist_ok=True)
+                
+                # Clear Excel processed files
+                processed_dir = Path(settings.DATA_DIR) / "processed"
+                files_deleted = []
+                if processed_dir.exists():
+                    for file_path in processed_dir.iterdir():
+                        if file_path.is_file() and file_path.suffix.lower() == ".json":
+                            try:
+                                import json
+                                with open(file_path, 'r', encoding='utf-8') as f:
+                                    doc_data = json.load(f)
+                                
+                                # Check if it's an Excel file
+                                filename = doc_data.get('metadata', {}).get('filename', '')
+                                if filename.lower().endswith('.xlsx'):
+                                    file_path.unlink()
+                                    files_deleted.append(file_path.name)
+                            except Exception as e:
+                                logger.warning(f"Could not read file {file_path}: {e}")
+                                continue
+                
+                return {"message": f"Excel index cleared: {len(files_deleted)} Excel processed files deleted"}
+                
+            except Exception as e:
+                logger.error(f"Error clearing Excel index: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
 
         
         @self.app.post("/system/reprocess-all-documents")
