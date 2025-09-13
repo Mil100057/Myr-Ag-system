@@ -185,8 +185,8 @@ curl -X POST -H "Content-Type: application/json" \
 
 ### Vector Storage
 - **Database**: LEANN with 97% space savings
-- **Embeddings**: 384-dimensional vectors
-- **Model**: paraphrase-multilingual-MiniLM-L12-v2
+- **Embeddings**: 768-dimensional vectors
+- **Model**: nomic-embed-text-v2-moe
 
 ## Best Practices
 

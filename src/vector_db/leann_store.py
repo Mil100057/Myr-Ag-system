@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 
+from config.settings import settings
+
 try:
     from leann.api import LeannBuilder, LeannSearcher
     LEANN_AVAILABLE = True
@@ -20,6 +22,8 @@ except ImportError:
     logging.warning("LEANN not available. Install with: pip install leann")
 
 from sentence_transformers import SentenceTransformer
+
+from ..utils.device_manager import device_manager, get_device, get_optimal_batch_size, cleanup_memory
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +46,7 @@ class LeannVectorStore:
     
     def __init__(self, 
                  index_name: str = None,
-                 embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+                 embedding_model: str = None,
                  backend: str = "hnsw",
                  graph_degree: int = 32,
                  complexity: int = 64,
@@ -69,21 +73,57 @@ class LeannVectorStore:
             index_name = settings.LEANN_INDEX_NAME
         
         self.index_name = index_name
-        self.embedding_model = embedding_model
+        self.embedding_model = embedding_model or settings.EMBEDDING_MODEL
         self.backend = backend
         self.graph_degree = graph_degree
         self.complexity = complexity
         self.use_compact = use_compact
         self.use_recompute = use_recompute
         
+        # Get optimal device for embeddings
+        self.device = get_device("embedding")
+        self.batch_size = get_optimal_batch_size("embedding", 32)
+        
         self.builder = None
         self.searcher = None
         # LEANN expects the .leann directory for index files
-        self.leann_index_path = Path(".leann")
+        # Use domain-specific paths to avoid conflicts between domains
+        self.leann_index_path = Path(f".leann_{index_name}")
         self.index_path = self.leann_index_path / index_name
+        
+        # Configure environment for optimal performance
+        self._configure_environment()
         
         logger.info(f"LEANN Vector Store initialized with index: {index_name}")
         logger.info(f"Backend: {backend}, Embedding model: {embedding_model}")
+        logger.info(f"Device: {self.device}, Batch size: {self.batch_size}")
+    
+    def _configure_environment(self):
+        """Configure environment for LEANN and SentenceTransformers."""
+        import os
+
+        # Set environment variables for optimal performance
+        if self.device == "mps":
+            # MPS optimizations
+            os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+            logger.info("Configured environment for MPS optimization")
+        else:
+            # CPU optimizations
+            os.environ['OMP_NUM_THREADS'] = '4'  # Limit CPU threads
+            logger.info("Configured environment for CPU optimization")
+        
+        # Fix tokenizers parallelism warning
+        os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+        
+        # Enable trust_remote_code for Hugging Face models
+        os.environ['TRUST_REMOTE_CODE'] = 'true'
+        
+        # Suppress torch_dtype deprecation warning
+        import warnings
+        warnings.filterwarnings("ignore", message=".*torch_dtype.*deprecated.*")
+        
+        logger.info("Configured TOKENIZERS_PARALLELISM=false to avoid warnings")
+        logger.info("Configured warnings filter for torch_dtype deprecation")
     
     def _ensure_index_directory(self):
         """Ensure the index directory exists."""
@@ -142,13 +182,17 @@ class LeannVectorStore:
             
             # Initialize builder if not already done
             if self.builder is None:
+                # Clean MPS memory before initializing LEANN
+                cleanup_memory("mps")
+                
                 self.builder = LeannBuilder(
                     backend_name=self.backend,
                     embedding_model=self.embedding_model,
                     graph_degree=self.graph_degree,
                     complexity=self.complexity,
                     compact=self.use_compact,
-                    recompute=self.use_recompute
+                    recompute=self.use_recompute,
+                    model_kwargs={"trust_remote_code": True}
                 )
                 
                 # Load existing documents if index exists
@@ -251,6 +295,65 @@ class LeannVectorStore:
         Returns:
             Dictionary with index information
         """
+        # Count unique documents and chunks by checking processed files for this domain
+        document_count = 0
+        chunk_count = 0
+        try:
+            from pathlib import Path
+            from config.settings import Settings
+            
+            settings = Settings()
+            processed_dir = Path(settings.DATA_DIR) / "processed"
+            
+            if processed_dir.exists():
+                # Count processed files that belong to this domain
+                for file_path in processed_dir.iterdir():
+                    if file_path.is_file() and file_path.suffix.lower() == ".json" and not file_path.name.endswith("_processed.json"):
+                        try:
+                            import json
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                doc_data = json.load(f)
+                            
+                            # Check if this document belongs to the current domain
+                            doc_domain = doc_data.get('domain', 'general')
+                            
+                            # Map index names to domain names
+                            if self.index_name == 'main_collection':
+                                expected_domain = 'general'
+                            else:
+                                expected_domain = self.index_name.replace('_collection', '')
+                            
+                            if doc_domain == expected_domain:
+                                document_count += 1
+                                
+                                # Count chunks from the corresponding _processed.json file
+                                processed_file = processed_dir / f"{file_path.stem}_processed.json"
+                                logger.info(f"Debug: Looking for processed file: {processed_file}")
+                                if processed_file.exists():
+                                    logger.info(f"Debug: Processed file exists: {processed_file}")
+                                    try:
+                                        with open(processed_file, 'r', encoding='utf-8') as f:
+                                            processed_data = json.load(f)
+                                        doc_chunks = processed_data.get('chunks', [])
+                                        chunk_count += len(doc_chunks)
+                                        logger.info(f"Debug: Document {file_path.name} matches domain {expected_domain} (index: {self.index_name}) - {len(doc_chunks)} chunks")
+                                    except Exception as e:
+                                        logger.warning(f"Could not read chunks from {processed_file}: {e}")
+                                        logger.info(f"Debug: Document {file_path.name} matches domain {expected_domain} (index: {self.index_name}) - 0 chunks (processed file error)")
+                                else:
+                                    logger.info(f"Debug: Document {file_path.name} matches domain {expected_domain} (index: {self.index_name}) - 0 chunks (no processed file)")
+                            else:
+                                logger.info(f"Debug: Document {file_path.name} does NOT match domain {expected_domain} (doc_domain='{doc_domain}', expected='{expected_domain}', index='{self.index_name}')")
+                                
+                        except Exception as e:
+                            logger.warning(f"Could not read domain from {file_path}: {e}")
+                            continue
+                            
+        except Exception as e:
+            logger.warning(f"Error counting documents for domain {self.index_name}: {e}")
+            document_count = 0
+            chunk_count = 0
+        
         info = {
             "index_name": self.index_name,
             "index_path": str(self.index_path),
@@ -262,7 +365,8 @@ class LeannVectorStore:
             "use_recompute": self.use_recompute,
             "index_exists": (self.leann_index_path / f"{self.index_name}.index").exists(),
             "searcher_initialized": self.searcher is not None,
-            "document_count": len(self.builder.chunks) if self.builder else 0
+            "document_count": document_count,
+            "chunk_count": chunk_count
         }
         
         # Get index size if it exists
@@ -383,7 +487,7 @@ class LeannVectorStoreManager:
     
     def create_store(self, 
                     index_name: str,
-                    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+                    embedding_model: str = None,
                     backend: str = "hnsw") -> LeannVectorStore:
         """
         Create a new LEANN vector store.
@@ -398,7 +502,7 @@ class LeannVectorStoreManager:
         """
         store = LeannVectorStore(
             index_name=index_name,
-            embedding_model=embedding_model,
+            embedding_model=embedding_model or settings.EMBEDDING_MODEL,
             backend=backend
         )
         
@@ -466,7 +570,7 @@ class LeannVectorStoreManager:
             
             # Estimate traditional vector database size
             # Rough estimation: 384 dimensions * 4 bytes * document_count
-            embedding_dim = 384  # sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+            embedding_dim = 768  # nomic-ai/nomic-embed-text-v2
             estimated_size = embedding_dim * 4 * len(documents)
             results["estimated_traditional_size"] = estimated_size
             results["estimated_traditional_size_mb"] = round(estimated_size / (1024 * 1024), 2)

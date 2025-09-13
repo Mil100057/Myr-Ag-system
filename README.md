@@ -4,9 +4,16 @@ A powerful RAG (Retrieval-Augmented Generation) system for document processing a
 
 ## Features
 
-- **Dual Processing Architecture**: Hybrid system combining LEANN vector store for general documents and LlamaIndex for Excel files
+- **Multi-Pipeline Architecture**: Advanced system with specialized pipelines for different document types and domains
   - **Standard Method**: LEANN vector store for PDFs, Word docs, text files, images
   - **Excel Specific Method**: LlamaIndex for Excel files with advanced spreadsheet processing (⚠️ EXPERIMENTAL)
+  - **Specialized Pipelines**: Domain-specific processing with user-controlled domain selection and query enhancement
+    - **Financial Pipeline**: Optimized for financial documents, reports, and data analysis
+    - **Legal Pipeline**: Specialized for legal documents, contracts, and compliance
+    - **Medical Pipeline**: Designed for medical documents, research, and clinical data
+    - **Academic Pipeline**: Tailored for academic papers, research, and scholarly content
+    - **Domain-Specific Indexes**: Each pipeline has its own isolated vector index for optimal performance
+    - **User-Controlled Domain Selection**: Manual domain assignment for precise document routing
 - **Hybrid Document Chunking**: Advanced chunking strategy combining paragraph-based splitting with enhanced sentence splitting
 - **Robust Document Processing**: Multi-format support with intelligent fallback mechanisms
   - **Docling**: Primary processor for PDF, DOCX, XLSX, PPTX, HTML, MD, images, and more
@@ -24,13 +31,78 @@ A powerful RAG (Retrieval-Augmented Generation) system for document processing a
 - **LEANN Vector Database**: Ultra-efficient vector storage with 97% space savings and fast retrieval
 - **LlamaIndex Integration**: Advanced Excel processing with persistent indexing (⚠️ EXPERIMENTAL)
 - **LLM Integration**: Ollama support for local LLM inference with dynamic model selection
+- **Query Enhancement**: Intelligent query enhancement for better domain-specific results
 - **Smart Processing**: Automatic document indexing and chunking with progress tracking
 - **System Management**: Comprehensive tools for managing documents, indexes, and system maintenance
-  - **Document Management**: Upload, process, view, and delete documents
+  - **Document Management**: Upload, process, view, and delete documents with domain assignment
+  - **Domain Indexing**: Index documents by domain with automatic detection or manual assignment
   - **Index Management**: Reset, rebuild, and clear indexes for both LEANN and LlamaIndex
+    - **Individual Domain Control**: Manage each domain (General, Financial, Legal, Medical, Academic, Excel) separately
+    - **Bulk Operations**: Reset/rebuild all indexes with a single operation
+    - **Domain-Specific Operations**: Targeted operations for specific domains
   - **Vector Store Monitoring**: Real-time status monitoring for both vector stores
   - **System Maintenance**: Reset, rebuild, and clear operations with data preservation
+    - **Granular Control**: Clear specific domains or all data
+    - **Safety Features**: Confirmation required for destructive operations
 - **Production Ready**: Comprehensive management scripts and tools
+
+## Specialized Pipelines
+
+The system includes specialized pipelines with user-controlled domain selection for precise document routing and optimal processing:
+
+### Pipeline Types
+
+#### 🏦 Financial Pipeline
+- **Optimized for**: Financial reports, statements, budgets, invoices
+- **Features**: 
+  - Focus on financial metrics and KPIs
+  - Revenue and profit trend analysis
+  - Financial health indicators
+  - Risk assessment and opportunities
+- **Query Enhancement**: Automatically enhances queries with financial terminology
+
+#### ⚖️ Legal Pipeline
+- **Optimized for**: Legal documents, contracts, agreements, compliance
+- **Features**:
+  - Legal provision and clause analysis
+  - Rights and obligations identification
+  - Legal implications and consequences
+  - Compliance and regulatory focus
+- **Query Enhancement**: Enhances queries with legal terminology and concepts
+
+#### 🏥 Medical Pipeline
+- **Optimized for**: Medical documents, research papers, clinical data
+- **Features**:
+  - Medical findings and diagnosis focus
+  - Treatment plan analysis
+  - Patient safety considerations
+  - Clinical recommendations
+- **Query Enhancement**: Uses medical terminology and clinical context
+
+#### 🎓 Academic Pipeline
+- **Optimized for**: Research papers, academic articles, scholarly content
+- **Features**:
+  - Research methodology analysis
+  - Key findings and results extraction
+  - Academic citation and reference tracking
+  - Theoretical implications
+- **Query Enhancement**: Enhances queries with academic terminology and research concepts
+
+### Auto-Detection
+
+The system automatically detects the appropriate pipeline based on:
+- Query content and keywords
+- Document metadata and content
+- Domain-specific terminology
+- Context clues in the question
+
+### Query Enhancement
+
+Each pipeline includes intelligent query enhancement that:
+- Rephrases queries for better domain-specific results
+- Adds relevant terminology and concepts
+- Improves search accuracy and relevance
+- Provides explanations for enhancements
 
 ## Quick Start
 
@@ -183,15 +255,44 @@ LEANN_BACKEND=hnsw
 - **Upload Timeout**: 15 minutes (for large documents)
 - **Processing Timeout**: 15 minutes (for complex processing)
 
+## Domain Management
+
+### User-Controlled Domain Selection
+
+The system provides full user control over document domain assignment, ensuring precise routing and optimal processing:
+
+#### Domain Assignment Process
+1. **Upload Document**: Upload your document using the web interface
+2. **Select Domain**: Choose the appropriate domain from the dropdown:
+   - **General**: For general-purpose documents
+   - **Financial**: For financial reports, statements, budgets
+   - **Legal**: For contracts, legal documents, compliance
+   - **Medical**: For medical records, research, clinical data
+   - **Academic**: For research papers, scholarly content
+3. **Process**: The document is processed using the selected domain's specialized pipeline
+
+#### Domain-Specific Benefits
+- **Isolated Indexes**: Each domain has its own vector index for optimal performance
+- **Specialized Processing**: Domain-specific chunking and query enhancement
+- **Targeted Queries**: Queries are routed to the appropriate domain index
+- **Granular Management**: Reset, rebuild, or clear individual domains
+
+#### System Management
+- **Index Management**: Select domain → Reset/Rebuild selected domain
+- **Data Clearing**: Select domain → Clear selected domain data
+- **Bulk Operations**: Reset/rebuild all domains at once
+- **Safety Features**: Confirmation required for destructive operations
+
 ## Usage
 
 ### 1. Upload Documents
 
 - Use the web interface to upload PDF, DOCX, TXT, or MD files
 - **Upload Only**: Upload documents without immediate processing
-- **Upload & Process**: Upload and immediately process documents
+- **Upload & Process**: Upload and immediately process documents with domain assignment
 - **Process Existing**: Process documents already in the uploads directory
 - **Process Uploaded Only**: Process only documents that haven't been processed yet
+- **Index by Domain**: Index documents by domain with automatic detection or manual assignment
 - Documents are automatically processed and chunked using intelligent fallback mechanisms
 - The hybrid chunking strategy creates meaningful, searchable chunks
 
@@ -221,6 +322,7 @@ LEANN_BACKEND=hnsw
 ### 3. System Management
 
 - **Document Management**: View, upload, process, and delete documents
+- **Domain Indexing**: Index documents by domain with automatic detection or manual assignment
 - **Index Management**: Reset, rebuild, and clear indexes for both LEANN and LlamaIndex
 - **Vector Store Monitoring**: Real-time status monitoring for both vector stores
 - **System Maintenance**: Comprehensive tools for system upkeep
@@ -268,7 +370,7 @@ Myr-Ag RAG System
 │   ├── LEANN Vector Database (General Documents)
 │   │   ├── HNSW backend for fast retrieval
 │   │   ├── 97% space savings vs traditional vector DBs
-│   │   └── Multilingual embeddings (384 dimensions)
+│   │   └── Multilingual embeddings (768 dimensions)
 │   └── LlamaIndex (Excel Files) - EXPERIMENTAL
 │       ├── Persistent Excel indexing
 │       ├── Advanced Excel chunking
@@ -332,6 +434,53 @@ Row 1: Employee: John Doe, Department: Sales | Salary: 50000
 - **Natural queries**: Ask questions in plain language
 - **Context preservation**: Maintains relationships between columns
 - **Multi-sheet support**: Search across all sheets simultaneously
+
+## Recent Updates & Fixes
+
+### System Improvements (Latest)
+
+- **✅ System Status & Statistics Fixed**: Complete overhaul of system monitoring and statistics
+  - **System Status**: Now shows accurate total documents and chunks across all domains
+  - **LEANN Vector Store Management**: Displays comprehensive information for all 7 collections (main + 6 domains)
+  - **Domain Statistics**: Real-time updates with correct document and chunk counts
+  - **Aggregated Totals**: Proper summation of data across all domain collections
+
+- **✅ Domain Indexing Fixed**: The "Index Documents by Domain" functionality now works correctly
+  - Fixed domain extraction logic in domain index manager
+  - Proper domain assignment and counting
+  - Support for both automatic detection and manual domain assignment
+
+- **✅ Document Processing Fixed**: Documents are now properly processed and indexed
+  - Fixed UI to use correct upload endpoint for immediate processing
+  - Proper domain assignment during upload
+  - Improved error handling and user feedback
+
+- **✅ Embedding Model Stability**: Switched to stable embedding model for reliable processing
+  - Current model: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
+  - 384-dimensional embeddings for optimal performance
+  - Multilingual support for English, French, and other languages
+
+- **✅ UI Improvements**: Enhanced user interface and experience
+  - Removed domain change functionality (replaced with domain indexing)
+  - Removed "Index Documents by Domain" and "Individual Domain Management" subsections from frontend
+  - Simplified document management workflow
+  - Better error messages and status indicators
+  - Automatic domain statistics loading on startup
+
+- **✅ API Performance**: Optimized API startup and response times
+  - Fixed slow startup due to unnecessary embedding model loading
+  - Streamlined initialization process
+  - Improved error handling and logging
+
+### Known Issues Resolved
+
+- **System Status Mismatch**: Fixed incorrect total_documents and total_chunks in system status
+- **LEANN Vector Store Info**: Now shows all domain collections instead of just main collection
+- **Domain Statistics Mismatch**: Fixed incorrect document/chunk counts in statistics
+- **Document Processing Failures**: Resolved issues with document not being processed after upload
+- **UI Startup Errors**: Fixed frontend startup issues after domain functionality changes
+- **LEANN Indexing Issues**: Resolved embedding model compatibility problems
+- **API Startup Performance**: Fixed slow startup due to multiple embedding model loading
 
 ## Troubleshooting
 
@@ -553,6 +702,14 @@ This project uses [Docling](https://github.com/docling-project/docling) for adva
 📄 **Complete format support**: See [Supported Formats Documentation](docs/supported_formats.md) for detailed information about all supported document types and processing capabilities.
 
 - **AI integrations** - seamless integration with LangChain, LlamaIndex, and other frameworks
+
+## Documentation
+
+- **[System Monitoring](docs/system_monitoring.md)** - Comprehensive monitoring and status documentation
+- **[Multi-Pipeline Architecture](docs/multi_pipeline_architecture.md)** - Detailed architecture and pipeline design
+- **[Data Structure Explanation](docs/data_structure_explanation.md)** - Data directory structure and organization
+- **[Architecture Diagrams](docs/architecture_diagrams.md)** - Visual system architecture and flow diagrams
+- **[Supported Formats](docs/supported_formats.md)** - Complete list of supported document types
 
 ## License
 

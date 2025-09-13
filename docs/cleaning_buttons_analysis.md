@@ -1,212 +1,201 @@
-# Cleaning Buttons Analysis - Myr-Ag User Interface
+# System Management Interface Analysis - Myr-Ag User Interface
 
-## Overview of Cleaning Buttons
+## Overview of System Management
 
-The Gradio user interface has **6 distinct maintenance buttons**, each with a specific function and different consequences.
+The Gradio user interface now features a **comprehensive System Management tab** with domain-specific controls and unified operations.
 
-## Available Buttons
+## Interface Structure
 
-### 1. 🔄 **Reset LEANN Index**
+### 1. Index Management Section
+
+#### Domain Selection Radio
+
 ```mermaid
 graph LR
-    A["Reset LEANN Index Button"] --> B["Supprime .leann/"]
-    B --> C["Recrée index LEANN"]
-    C --> D["Conserve processed/ et uploads/"]
-    
-    style A fill:#ff6b6b,stroke:#d63031,stroke-width:2px
-    style B fill:#fdcb6e,stroke:#e17055,stroke-width:2px
-    style C fill:#74b9ff,stroke:#0984e3,stroke-width:2px
-    style D fill:#55a3ff,stroke:#00b894,stroke-width:2px
+    A["Domain Selection Radio"] --> B["General Index"]
+    A --> C["Financial Domain"]
+    A --> D["Legal Domain"]
+    A --> E["Medical Domain"]
+    A --> F["Academic Domain"]
+    A --> G["Excel Index"]
+    A --> H["All Indexes"]
+  
+    style A fill:#74b9ff,stroke:#0984e3,stroke-width:2px
+    style B fill:#55a3ff,stroke:#00b894,stroke-width:2px
+    style C fill:#fdcb6e,stroke:#e17055,stroke-width:2px
+    style D fill:#fd79a8,stroke:#e84393,stroke-width:2px
+    style E fill:#6c5ce7,stroke:#5f3dc4,stroke-width:2px
+    style F fill:#a29bfe,stroke:#6c5ce7,stroke-width:2px
+    style G fill:#00b894,stroke:#00a085,stroke-width:2px
+    style H fill:#ff7675,stroke:#d63031,stroke-width:2px
 ```
 
-**Function:** Resets only the LEANN vector database
+**Available Options:**
 
-**Impact:**
-- ✅ **Removes:** LEANN index (embeddings, metadata)
-- ✅ **Preserves:** Processed documents and uploads
-- ✅ **Result:** Documents available but not indexed
+- **General Index**: Manages the main LEANN index
+- **Financial Domain**: Manages financial-specific index
+- **Legal Domain**: Manages legal-specific index
+- **Medical Domain**: Manages medical-specific index
+- **Academic Domain**: Manages academic-specific index
+- **Excel Index**: Manages LlamaIndex Excel database
+- **All Indexes**: Manages all indexes simultaneously
 
-**API Code:** `DELETE /system/reset-index`
-**Implementation:** ✅ Complete and functional
+#### Operations
 
----
+- **Reset Selected Index**: Resets the selected domain index (preserves data)
+- **Rebuild Selected Index**: Rebuilds the selected domain index from processed documents
+- **Dynamic Description**: Shows description based on selected domain
 
-### 2. 🔨 **Rebuild LEANN Index**
+### 2. Data Management Section
+
+#### Domain Selection Radio
+
 ```mermaid
 graph LR
-    A["Rebuild LEANN Index Button"] --> B["Lit processed/"]
-    B --> C["Recrée index LEANN"]
-    C --> D["Conserve processed/ et uploads/"]
-    
-    style A fill:#00b894,stroke:#00a085,stroke-width:2px
-    style B fill:#fdcb6e,stroke:#e17055,stroke-width:2px
-    style C fill:#74b9ff,stroke:#0984e3,stroke-width:2px
-    style D fill:#55a3ff,stroke:#00b894,stroke-width:2px
+    A["Domain Selection Radio"] --> B["General Index"]
+    A --> C["Financial Domain"]
+    A --> D["Legal Domain"]
+    A --> E["Medical Domain"]
+    A --> F["Academic Domain"]
+    A --> G["Excel Index"]
+    A --> H["All Data"]
+  
+    style A fill:#74b9ff,stroke:#0984e3,stroke-width:2px
+    style B fill:#55a3ff,stroke:#00b894,stroke-width:2px
+    style C fill:#fdcb6e,stroke:#e17055,stroke-width:2px
+    style D fill:#fd79a8,stroke:#e84393,stroke-width:2px
+    style E fill:#6c5ce7,stroke:#5f3dc4,stroke-width:2px
+    style F fill:#a29bfe,stroke:#6c5ce7,stroke-width:2px
+    style G fill:#00b894,stroke:#00a085,stroke-width:2px
+    style H fill:#ff7675,stroke:#d63031,stroke-width:2px
 ```
 
-**Function:** Rebuilds the LEANN index from existing processed documents
+#### Operations
 
-**Impact:**
-- ✅ **Reads:** Processed documents from data/processed/
-- ✅ **Rebuilds:** LEANN index with current documents
-- ✅ **Preserves:** All processed documents and uploads
-- ✅ **Result:** Fresh index with all available documents
+- **Clear Selected Domain**: Clears the selected domain data (destructive operation)
+- **Confirmation Required**: Checkbox to confirm destructive operations
+- **Dynamic Description**: Shows impact description based on selection
 
-**API Code:** `POST /system/rebuild-index`
-**Implementation:** ✅ Complete and functional
+## API Endpoints
 
----
+### Index Management Endpoints
 
-### 3. 🔄 **Reset LlamaIndex Excel**
+| Endpoint                       | Method | Function                      | Domain Support                      |
+| ------------------------------ | ------ | ----------------------------- | ----------------------------------- |
+| `/system/reset-index`        | POST   | Reset general LEANN index     | General only                        |
+| `/domains/{domain}/reset`    | POST   | Reset specific domain index   | Financial, Legal, Medical, Academic |
+| `/system/reset-llamaindex`   | POST   | Reset Excel index             | Excel only                          |
+| `/system/rebuild-index`      | POST   | Rebuild general LEANN index   | General only                        |
+| `/domains/{domain}/rebuild`  | POST   | Rebuild specific domain index | Financial, Legal, Medical, Academic |
+| `/system/rebuild-llamaindex` | POST   | Rebuild Excel index           | Excel only                          |
+| `/system/rebuild-all`        | POST   | Rebuild all indexes           | All domains                         |
+
+### Data Management Endpoints
+
+| Endpoint                          | Method | Function                          | Domain Support                      |
+| --------------------------------- | ------ | --------------------------------- | ----------------------------------- |
+| `/system/clear-general`         | DELETE | Clear general index + documents   | General only                        |
+| `/system/clear-domain/{domain}` | DELETE | Clear specific domain + documents | Financial, Legal, Medical, Academic |
+| `/system/clear-excel`           | DELETE | Clear Excel index + files         | Excel only                          |
+| `/system/clear-all`             | DELETE | Clear everything                  | All domains                         |
+
+## Domain-Specific Operations
+
+### General Index Operations
+
 ```mermaid
-graph LR
-    A["Reset LlamaIndex Excel Button"] --> B["Supprime llamaindex_excel_index/"]
-    B --> C["Recrée index LlamaIndex Excel"]
-    C --> D["Conserve processed/ et uploads/"]
-    
-    style A fill:#ff6b6b,stroke:#d63031,stroke-width:2px
-    style B fill:#fdcb6e,stroke:#e17055,stroke-width:2px
-    style C fill:#74b9ff,stroke:#0984e3,stroke-width:2px
-    style D fill:#55a3ff,stroke:#00b894,stroke-width:2px
-```
-
-**Function:** Resets only the LlamaIndex Excel database
-
-**Impact:**
-- ✅ **Removes:** LlamaIndex Excel index (embeddings, metadata)
-- ✅ **Preserves:** Processed Excel files and uploads
-- ✅ **Result:** Excel files available but not indexed
-
-**API Code:** `DELETE /system/reset-llamaindex`
-**Implementation:** ✅ Complete and functional
-
----
-
-### 4. 🔨 **Rebuild LlamaIndex Excel**
-```mermaid
-graph LR
-    A["Rebuild LlamaIndex Excel Button"] --> B["Lit processed Excel files"]
-    B --> C["Recrée index LlamaIndex Excel"]
-    C --> D["Conserve processed/ et uploads/"]
-    
-    style A fill:#00b894,stroke:#00a085,stroke-width:2px
-    style B fill:#fdcb6e,stroke:#e17055,stroke-width:2px
-    style C fill:#74b9ff,stroke:#0984e3,stroke-width:2px
-    style D fill:#55a3ff,stroke:#00b894,stroke-width:2px
-```
-
-**Function:** Rebuilds the LlamaIndex Excel index from existing processed Excel files
-
-**Impact:**
-- ✅ **Reads:** Processed Excel files from data/processed/
-- ✅ **Rebuilds:** LlamaIndex Excel index with current files
-- ✅ **Preserves:** All processed documents and uploads
-- ✅ **Result:** Fresh Excel index with all available files
-
-**API Code:** `POST /system/rebuild-llamaindex`
-**Implementation:** ✅ Complete and functional
-
----
-
-### 5. 🗑️ **Clear LEANN Documents**
-```mermaid
-graph LR
-    A["Clear LEANN Documents Button"] --> B["Supprime .leann/"]
-    B --> C["Supprime processed/ (non-Excel)"]
-    C --> D["Conserve uploads/ et Excel processed/"]
-    D --> E["Recrée répertoires vides"]
-    
-    style A fill:#ff7675,stroke:#d63031,stroke-width:2px
-    style B fill:#fdcb6e,stroke:#e17055,stroke-width:2px
-    style C fill:#fd79a8,stroke:#e84393,stroke-width:2px
-    style D fill:#55a3ff,stroke:#00b894,stroke-width:2px
-    style E fill:#74b9ff,stroke:#0984e3,stroke-width:2px
-```
-
-**Function:** Clears LEANN index and non-Excel processed documents
-
-**Impact:**
-- ✅ **Removes:** LEANN index + Non-Excel processed documents
-- ✅ **Preserves:** Upload documents + Excel processed files
-- ✅ **Result:** Raw documents + Excel files available, LEANN cleared
-
-**API Code:** `DELETE /system/clear-documents`
-**Implementation:** ✅ Complete and functional
-
----
-
-### 6. 🗑️ **Clear LlamaIndex Excel**
-```mermaid
-graph LR
-    A["Clear LlamaIndex Excel Button"] --> B["Supprime llamaindex_excel_index/"]
-    B --> C["Supprime processed/ Excel files"]
-    C --> D["Conserve uploads/ et autres processed/"]
-    D --> E["Recrée répertoires vides"]
-    
-    style A fill:#ff7675,stroke:#d63031,stroke-width:2px
-    style B fill:#fdcb6e,stroke:#e17055,stroke-width:2px
-    style C fill:#fd79a8,stroke:#e84393,stroke-width:2px
-    style D fill:#55a3ff,stroke:#00b894,stroke-width:2px
-    style E fill:#74b9ff,stroke:#0984e3,stroke-width:2px
-```
-
-**Function:** Clears LlamaIndex Excel index and Excel processed files
-
-**Impact:**
-- ✅ **Removes:** LlamaIndex Excel index + Excel processed files
-- ✅ **Preserves:** Upload documents + Non-Excel processed files
-- ✅ **Result:** Raw documents + non-Excel files available, Excel cleared
-
-**API Code:** `DELETE /system/clear-llamaindex`
-**Implementation:** ✅ Complete and functional
-
----
-
-### 7. 💥 **Clear Everything**
-```mermaid
-graph LR
-    A["Clear Everything Button"] --> B["Supprime .leann/"]
-    B --> C["Supprime llamaindex_excel_index/"]
-    C --> D["Supprime processed/"]
-    D --> E["Supprime uploads/"]
-    E --> F["Recrée tous les répertoires vides"]
-    
-    style A fill:#e84393,stroke:#6c5ce7,stroke-width:3px
-    style B fill:#fdcb6e,stroke:#e17055,stroke-width:2px
-    style C fill:#fd79a8,stroke:#e84393,stroke-width:2px
+graph TB
+    A["General Index Selected"] --> B["Reset General Index"]
+    A --> C["Rebuild General Index"]
+    A --> D["Clear General Data"]
+  
+    B --> E["Removes .leann_main_collection"]
+    C --> F["Rebuilds from all processed documents"]
+    D --> G["Removes index + all processed documents"]
+  
+    style A fill:#55a3ff,stroke:#00b894,stroke-width:2px
+    style B fill:#74b9ff,stroke:#0984e3,stroke-width:2px
+    style C fill:#00b894,stroke:#00a085,stroke-width:2px
     style D fill:#ff7675,stroke:#d63031,stroke-width:2px
-    style E fill:#ff6b6b,stroke:#d63031,stroke-width:2px
-    style F fill:#74b9ff,stroke:#0984e3,stroke-width:2px
 ```
 
-**Function:** Clears EVERYTHING in the system
+### Domain-Specific Operations (Financial, Legal, Medical, Academic)
 
-**Impact:**
-- ✅ **Removes:** LEANN index + LlamaIndex Excel + All processed documents + All upload documents
-- ✅ **Preserves:** Nothing
-- ✅ **Result:** Completely empty system
+```mermaid
+graph TB
+    A["Domain Selected"] --> B["Reset Domain Index"]
+    A --> C["Rebuild Domain Index"]
+    A --> D["Clear Domain Data"]
+  
+    B --> E["Removes .leann_{domain}_collection"]
+    C --> F["Rebuilds from domain-specific documents"]
+    D --> G["Removes domain index + domain documents"]
+  
+    style A fill:#fdcb6e,stroke:#e17055,stroke-width:2px
+    style B fill:#74b9ff,stroke:#0984e3,stroke-width:2px
+    style C fill:#00b894,stroke:#00a085,stroke-width:2px
+    style D fill:#ff7675,stroke:#d63031,stroke-width:2px
+```
 
-**API Code:** `DELETE /system/clear-all`
-**Implementation:** ✅ Complete and functional
+### Excel Index Operations
 
-## Summary
+```mermaid
+graph TB
+    A["Excel Index Selected"] --> B["Reset Excel Index"]
+    A --> C["Rebuild Excel Index"]
+    A --> D["Clear Excel Data"]
+  
+    B --> E["Removes LlamaIndex Excel index"]
+    C --> F["Rebuilds from Excel processed files"]
+    D --> G["Removes Excel index + Excel files"]
+  
+    style A fill:#00b894,stroke:#00a085,stroke-width:2px
+    style B fill:#74b9ff,stroke:#0984e3,stroke-width:2px
+    style C fill:#00b894,stroke:#00a085,stroke-width:2px
+    style D fill:#ff7675,stroke:#d63031,stroke-width:2px
+```
 
-The system provides **7 maintenance buttons** organized by function:
+### All Domains Operations
 
-### **Reset Operations** (Index only)
-- **Reset LEANN Index** - Clears LEANN index, keeps documents
-- **Reset LlamaIndex Excel** - Clears Excel index, keeps files
+```mermaid
+graph TB
+    A["All Domains Selected"] --> B["Reset All Indexes"]
+    A --> C["Rebuild All Indexes"]
+    A --> D["Clear All Data"]
+  
+    B --> E["Resets all domain indexes"]
+    C --> F["Rebuilds all indexes from processed documents"]
+    D --> G["Removes everything (⚠️ DANGER)"]
+  
+    style A fill:#ff7675,stroke:#d63031,stroke-width:2px
+    style B fill:#74b9ff,stroke:#0984e3,stroke-width:2px
+    style C fill:#00b894,stroke:#00a085,stroke-width:2px
+    style D fill:#ff7675,stroke:#d63031,stroke-width:2px
+```
 
-### **Rebuild Operations** (Recreate from existing)
-- **Rebuild LEANN Index** - Rebuilds LEANN from processed documents
-- **Rebuild LlamaIndex Excel** - Rebuilds Excel index from processed files
+## Safety Features
 
-### **Clear Operations** (Remove data)
-- **Clear LEANN Documents** - Removes LEANN + non-Excel processed files
-- **Clear LlamaIndex Excel** - Removes Excel index + Excel processed files
-- **Clear Everything** - Removes everything
+### Confirmation System
 
-Each button requires confirmation via checkbox for safety.
+- **Index Operations**: No confirmation required (non-destructive)
+- **Data Operations**: Confirmation checkbox required (destructive)
+- **All Data Operation**: Extra warning in description
 
+### Operation Impact Matrix
 
+| Operation       | Index Impact | Data Impact | Uploads Impact | Confirmation |
+| --------------- | ------------ | ----------- | -------------- | ------------ |
+| Reset General   | Removes      | Preserves   | Preserves      | No           |
+| Reset Domain    | Removes      | Preserves   | Preserves      | No           |
+| Reset Excel     | Removes      | Preserves   | Preserves      | No           |
+| Rebuild General | Rebuilds     | Preserves   | Preserves      | No           |
+| Rebuild Domain  | Rebuilds     | Preserves   | Preserves      | No           |
+| Rebuild Excel   | Rebuilds     | Preserves   | Preserves      | No           |
+| Clear General   | Removes      | Removes     | Preserves      | Yes          |
+| Clear Domain    | Removes      | Removes     | Preserves      | Yes          |
+| Clear Excel     | Removes      | Removes     | Preserves      | Yes          |
+| Clear All       | Removes      | Removes     | Removes        | Yes          |
 
+---
+
+*This analysis reflects the current System Management interface as of the latest update with domain-specific controls and unified operations.*

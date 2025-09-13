@@ -1,304 +1,236 @@
 # Myr-Ag Architecture & Processing Diagrams
 
-## General Application Architecture
+## System Overview
 
 ```mermaid
-graph TB
-    subgraph UILayer["User Interface Layer"]
-        UI["Gradio Web Interface<br/>Port 7860"]
-        API["FastAPI Backend<br/>Port 8199"]
-        MAINT["Maintenance Buttons<br/>7 Operations"]
+graph LR
+    subgraph User["User"]
+        U["Web Interface"]
     end
     
-    subgraph CoreLayer["Core Processing Layer"]
-        DP["Document Processor"]
-        VS["Vector Store<br/>LEANN"]
-        LIX["LlamaIndex<br/>Excel Processing<br/>(EXPERIMENTAL)"]
-        DI["Document Indexer"]
-        RP["RAG Pipeline"]
-        OC["Ollama Client"]
+    subgraph App["Myr-Ag Application"]
+        API["API Server"]
+        PROC["Document Processor"]
+        RAG["RAG Engine"]
+        MON["System Monitor"]
     end
     
-    subgraph DataLayer["Data Storage Layer"]
-        UPLOADS["Uploads Directory"]
-        PROCESSED["Processed Documents"]
-        VECTOR_DB["LEANN Vector Database<br/>Ultra-efficient Storage"]
-        LIX_DB["LlamaIndex Excel Database<br/>(EXPERIMENTAL)"]
+    subgraph Data["Data Storage"]
+        DOCS["Documents"]
+        VECTORS["Vector Indexes"]
+        COLLECTIONS["Domain Collections"]
     end
     
-    subgraph ExternalLayer["External Services"]
-        OLLAMA["Ollama Server<br/>Port 11434"]
-        LLM["LLM Models<br/>llama3.2:3b"]
+    subgraph AI["AI Model"]
+        LLM["Ollama LLM"]
     end
     
-    UI -->|"HTTP Requests"| API
-    API -->|"HTTP Responses"| UI
-    MAINT -->|"Maintenance Operations"| API
+    U -->|"Upload & Query"| API
+    API -->|"Process"| PROC
+    API -->|"Search"| RAG
+    API -->|"Monitor"| MON
+    PROC -->|"Store"| DOCS
+    PROC -->|"Index"| VECTORS
+    VECTORS -->|"Domain Collections"| COLLECTIONS
+    RAG -->|"Search"| VECTORS
+    RAG -->|"Generate"| LLM
+    LLM -->|"Answer"| RAG
+    RAG -->|"Response"| API
+    MON -->|"Statistics"| COLLECTIONS
+    API -->|"Result"| U
     
-    API -->|"Document Upload"| DP
-    API -->|"Query Requests"| RP
-    API -->|"System Info"| VS
-    API -->|"Excel Info"| LIX
-    API -->|"Reset/Rebuild/Clear"| VS
-    API -->|"Reset/Rebuild/Clear"| LIX
+    classDef user fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef app fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef data fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef ai fill:#fff3e0,stroke:#e65100,stroke-width:2px
     
-    DP -->|"Processed Text"| DI
-    DI -->|"Chunks + Metadata"| VS
-    DI -->|"Excel Chunks"| LIX
-    VS -->|"Embeddings"| VECTOR_DB
-    LIX -->|"Excel Index"| LIX_DB
-    
-    RP -->|"Search Query"| VS
-    RP -->|"Excel Query"| LIX
-    VS -->|"Relevant Chunks"| RP
-    LIX -->|"Excel Chunks"| RP
-    RP -->|"Context + Question"| OC
-    OC -->|"LLM Request"| OLLAMA
-    OLLAMA -->|"Generated Response"| OC
-    OC -->|"Answer"| RP
-    RP -->|"Final Response"| API
-    
-    UPLOADS -->|"Raw Documents"| DP
-    DP -->|"Processed Data"| PROCESSED
-    VS -->|"Vector Data"| VECTOR_DB
-    LIX -->|"Excel Data"| LIX_DB
-    
-    classDef uiLayer fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef coreLayer fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef dataLayer fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef externalLayer fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
-    class UI,API,MAINT uiLayer
-    class DP,VS,LIX,DI,RP,OC coreLayer
-    class UPLOADS,PROCESSED,VECTOR_DB,LIX_DB dataLayer
-    class OLLAMA,LLM externalLayer
+    class U user
+    class API,PROC,RAG,MON app
+    class DOCS,VECTORS,COLLECTIONS data
+    class LLM ai
 ```
 
-## Dual Processing Architecture
+## System Monitoring Architecture
 
 ```mermaid
 graph TB
-    subgraph DocumentInput["Document Input"]
-        UPLOAD["Document Upload<br/>PDF/DOCX/XLSX/TXT/MD"]
+    subgraph UI["User Interface"]
+        STATUS["System Status"]
+        VECTOR["LEANN Vector Store Management"]
+        DOMAIN["Domain Statistics"]
     end
     
-    subgraph ProcessingDecision["Processing Decision"]
-        UPLOAD --> CHECK{"File Type?"}
-        CHECK -->|"Excel (.xlsx)"| EXCEL_PATH["Excel Processing Path<br/>(EXPERIMENTAL)"]
-        CHECK -->|"Other Formats"| GENERAL_PATH["General Processing Path"]
+    subgraph API["API Endpoints"]
+        SYS_INFO["/system/info"]
+        VECTOR_INFO["/system/vector-store"]
+        DOMAIN_STATS["/domains/statistics"]
     end
     
-    subgraph ExcelProcessing["Excel Processing (LlamaIndex)"]
-        EXCEL_PATH --> EXCEL_EXTRACT["Excel Text Extraction<br/>Docling"]
-        EXCEL_EXTRACT --> EXCEL_CHUNK["Row-based Chunking<br/>Column-aware Processing"]
-        EXCEL_CHUNK --> EXCEL_EMBED["Embedding Generation<br/>Sentence Transformers"]
-        EXCEL_EMBED --> EXCEL_STORE["LlamaIndex Storage<br/>Persistent Index"]
+    subgraph COLLECTIONS["Domain Collections"]
+        MAIN["main_collection"]
+        FINANCIAL["financial_collection"]
+        LEGAL["legal_collection"]
+        MEDICAL["medical_collection"]
+        ACADEMIC["academic_collection"]
+        EXCEL["excel_collection"]
+        GENERAL["general_collection"]
     end
     
-    subgraph GeneralProcessing["General Processing (LEANN)"]
-        GENERAL_PATH --> GENERAL_EXTRACT["Text Extraction<br/>Docling/pypdf"]
-        GENERAL_EXTRACT --> GENERAL_CHUNK["Sentence-based Chunking<br/>400 chars, 100 overlap"]
-        GENERAL_CHUNK --> GENERAL_EMBED["Embedding Generation<br/>Sentence Transformers"]
-        GENERAL_EMBED --> GENERAL_STORE["LEANN Storage<br/>Ultra-efficient Index"]
+    subgraph STATS["Statistics Engine"]
+        AGGREGATOR["Statistics Aggregator"]
+        COUNTER["Document/Chunk Counter"]
+        MONITOR["Collection Monitor"]
     end
     
-    subgraph QueryProcessing["Query Processing"]
-        QUERY["User Query"] --> METHOD{"Query Method?"}
-        METHOD -->|"Standard"| LEANN_SEARCH["LEANN Search<br/>General Documents"]
-        METHOD -->|"Excel Specific"| LIX_SEARCH["LlamaIndex Search<br/>Excel Files Only"]
-        
-        LEANN_SEARCH --> LEANN_RESULTS["LEANN Results"]
-        LIX_SEARCH --> LIX_RESULTS["LlamaIndex Results"]
-        
-        LEANN_RESULTS --> LLM_GEN["LLM Generation<br/>Ollama"]
-        LIX_RESULTS --> LLM_GEN
-        LLM_GEN --> RESPONSE["Final Response"]
-    end
+    UI -->|"Display"| API
+    API -->|"Query"| STATS
+    STATS -->|"Monitor"| COLLECTIONS
+    COLLECTIONS -->|"Data"| STATS
+    STATS -->|"Aggregated Stats"| API
+    API -->|"Real-time Data"| UI
     
-    %% Styling
-    classDef inputLayer fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef decisionLayer fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef excelLayer fill:#ffebee,stroke:#c62828,stroke-width:2px
-    classDef generalLayer fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef queryLayer fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef ui fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef api fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef collections fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef stats fill:#fff3e0,stroke:#e65100,stroke-width:2px
     
-    class UPLOAD inputLayer
-    class CHECK,METHOD decisionLayer
-    class EXCEL_PATH,EXCEL_EXTRACT,EXCEL_CHUNK,EXCEL_EMBED,EXCEL_STORE,LIX_SEARCH,LIX_RESULTS excelLayer
-    class GENERAL_PATH,GENERAL_EXTRACT,GENERAL_CHUNK,GENERAL_EMBED,GENERAL_STORE,LEANN_SEARCH,LEANN_RESULTS generalLayer
-    class QUERY,LLM_GEN,RESPONSE queryLayer
+    class STATUS,VECTOR,DOMAIN ui
+    class SYS_INFO,VECTOR_INFO,DOMAIN_STATS api
+    class MAIN,FINANCIAL,LEGAL,MEDICAL,ACADEMIC,EXCEL,GENERAL collections
+    class AGGREGATOR,COUNTER,MONITOR stats
 ```
 
 ## Document Processing Flow
 
 ```mermaid
 flowchart TD
-    subgraph UploadProcessing["Document Upload & Processing"]
-        A["Document Upload<br/>PDF/DOCX/TXT/MD"] --> B{"File Validation"}
-        B -->|"Valid"| C["Text Extraction<br/>via Docling"]
-        B -->|"Invalid"| D["Error Response"]
-        
-        C --> E["Text Chunking<br/>Size: 400 chars<br/>Overlap: 100 chars<br/>Sentence-based strategy"]
-        E --> F["Metadata Extraction<br/>File info, timestamps"]
-        
-        F --> G["Save Processed Document<br/>JSON format"]
-        G --> H["Document Indexing"]
+    subgraph Upload["Upload"]
+        A["Document Upload<br/>PDF/DOCX/XLSX"]
     end
-    
-    subgraph VectorProcessing["Vector Database Processing"]
-        H --> I["Generate Embeddings<br/>sentence-transformers<br/>paraphrase-multilingual-MiniLM-L12-v2"]
-        I --> J["Store in LEANN<br/>Index: main_collection<br/>Ultra-efficient storage"]
-        J --> K["Build Index<br/>HNSW + CSR format<br/>97% space savings"]
+  
+    subgraph Decision["File Type Decision"]
+        B{"File Type?"}
     end
-    
-    subgraph RAGProcessing["RAG Query Processing"]
-        L["User Query"] --> M["Query Preprocessing"]
-        M --> N["Semantic Search<br/>Find relevant chunks"]
-        N --> O["Retrieve Top Chunks<br/>Default: 5 chunks"]
-        
-        O --> P["Context Assembly<br/>Chunk content + metadata"]
-        P --> Q["LLM Prompt Construction<br/>Context + Question"]
-        
-        Q --> R["Ollama API Call<br/>Model: llama3.2:3b"]
-        R --> S["Response Generation<br/>Temperature: 0.7"]
-        
-        S --> T["Confidence Scoring<br/>Based on context relevance"]
-        T --> U["Response Assembly<br/>Answer + Sources + Metadata"]
+  
+    subgraph GeneralProcess["General Documents Process"]
+        C1["Extract Text<br/>Docling"]
+        C2["Create Chunks<br/>400 chars, sentence-based"]
+        C3["Generate Embeddings<br/>Sentence Transformers"]
+        C4["Store in LEANN<br/>Domain-specific index"]
     end
-    
-    subgraph ResponseDelivery["Response Delivery"]
-        U --> V["API Response<br/>JSON format"]
-        V --> W["User Interface Display"]
+  
+    subgraph ExcelProcess["Excel Files Process"]
+        D1["Parse Excel<br/>LlamaIndex"]
+        D2["Row-based Chunking<br/>Column-aware processing"]
+        D3["Generate Embeddings<br/>LlamaIndex embeddings"]
+        D4["Store in LlamaIndex<br/>Persistent database"]
     end
-    
-    %% Styling
-    classDef uploadFlow fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    classDef vectorFlow fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    classDef ragFlow fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef responseFlow fill:#fce4ec,stroke:#880e4f,stroke-width:2px
-    
-    class A,B,C,D,E,F,G uploadFlow
-    class H,I,J,K vectorFlow
-    class L,M,N,O,P,Q,R,S,T ragFlow
-    class U,V,W responseFlow
+  
+    subgraph Storage["Storage Result"]
+        E["Documents Ready<br/>for Query"]
+    end
+  
+    A --> B
+    B -->|"PDF/DOCX/TXT/MD"| C1
+    B -->|"XLSX"| D1
+  
+    C1 --> C2
+    C2 --> C3
+    C3 --> C4
+  
+    D1 --> D2
+    D2 --> D3
+    D3 --> D4
+  
+    C4 --> E
+    D4 --> E
+  
+    classDef upload fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef decision fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef generalProcess fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef excelProcess fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef storage fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+  
+    class A upload
+    class B decision
+    class C1,C2,C3,C4 generalProcess
+    class D1,D2,D3,D4 excelProcess
+    class E storage
 ```
 
-## System Components Detail
+## Domain Management
 
 ```mermaid
-graph LR
-    subgraph DocumentModule["Document Processing Module"]
-        DP["DocumentProcessor"]
-        DE["Docling Extractor"]
-        TC["Text Chunker"]
-        ME["Metadata Extractor"]
-        
-        DP --> DE
-        DP --> TC
-        DP --> ME
+graph TB
+    subgraph User["User"]
+        UPLOAD["Upload Document"]
+        SELECT["Choose Domain<br/>General, Financial, Legal, Medical, Academic"]
     end
-    
-    subgraph VectorModule["Vector Database Module"]
-        VS["VectorStore"]
-        EM["Embedding Model"]
-        LEANN["LEANN Client"]
-        SC["Search Controller"]
-        
-        VS --> EM
-        VS --> LEANN
-        VS --> SC
+  
+    subgraph System["System"]
+        PROCESS["Process Document"]
+        ROUTE["Route to Domain Index"]
     end
-    
-    subgraph LLMModule["LLM Integration Module"]
-        RP["RAGPipeline"]
-        OC["OllamaClient"]
-        QC["Query Controller"]
-        RC["Response Controller"]
-        
-        RP --> OC
-        RP --> QC
-        RP --> RC
+  
+    subgraph Indexes["Domain Indexes"]
+        GENERAL[".leann_main_collection<br/>General Documents"]
+        FINANCIAL[".leann_financial_collection<br/>Financial Documents"]
+        LEGAL[".leann_legal_collection<br/>Legal Documents"]
+        MEDICAL[".leann_medical_collection<br/>Medical Documents"]
+        ACADEMIC[".leann_academic_collection<br/>Academic Documents"]
+        EXCEL["LlamaIndex Database<br/>Excel Files"]
     end
-    
-    subgraph APILayer["API Layer"]
-        FA["FastAPI App"]
-        DR["Document Routes"]
-        QR["Query Routes"]
-        SR["System Routes"]
-        
-        FA --> DR
-        FA --> QR
-        FA --> SR
-    end
-    
-    %% Connections between modules
-    DP --> VS
-    VS --> RP
-    RP --> FA
-    
-    %% Styling
-    classDef module fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef component fill:#e8f5e8,stroke:#1b5e20,stroke-width:1px
-    
-    class DP,VS,RP,FA module
-    class DE,TC,ME,EM,LEANN,SC,OC,QC,RC,DR,QR,SR component
+  
+    UPLOAD --> PROCESS
+    SELECT --> PROCESS
+    PROCESS --> ROUTE
+  
+    ROUTE -->|"General"| GENERAL
+    ROUTE -->|"Financial"| FINANCIAL
+    ROUTE -->|"Legal"| LEGAL
+    ROUTE -->|"Medical"| MEDICAL
+    ROUTE -->|"Academic"| ACADEMIC
+    ROUTE -->|"Excel"| EXCEL
+  
+    classDef user fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef system fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef indexes fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+  
+    class UPLOAD,SELECT user
+    class PROCESS,ROUTE system
+    class GENERAL,FINANCIAL,LEGAL,MEDICAL,ACADEMIC,EXCEL indexes
 ```
 
-## Data Flow Architecture
+## Data Storage Structure
 
 ```mermaid
-graph TD
-    subgraph InputLayer["Input Layer"]
-        UPLOAD["Document Upload<br/>HTTP POST"]
-        QUERY["User Query<br/>HTTP POST"]
+graph TB
+    subgraph DataDir["Data Directory"]
+        subgraph Uploads["Uploads"]
+            UPLOADS["uploads/<br/>Raw documents"]
+        end
+   
+        subgraph Processed["Processed"]
+            PROCESSED["processed/<br/>JSON files with metadata"]
+        end
+   
+        subgraph Indexes["Vector Indexes"]
+            LEANN_INDEXES[".leann_*_collection/<br/>Domain-specific LEANN indexes<br/>General, Financial, Legal, Medical, Academic"]
+            EXCEL_INDEX["llamaindex_excel_index/<br/>Excel files database"]
+        end
     end
     
-    subgraph ProcessingPipeline["Processing Pipeline"]
-        EXTRACT["Text Extraction<br/>Docling"]
-        CHUNK["Text Chunking<br/>LlamaIndex"]
-        EMBED["Embedding Generation<br/>Sentence Transformers"]
-        STORE["Vector Storage<br/>LEANN"]
-        SEARCH["Semantic Search<br/>Vector Similarity"]
-        GENERATE["LLM Generation<br/>Ollama"]
-    end
+    UPLOADS -->|"Process"| PROCESSED
+    PROCESSED -->|"Index by domain"| LEANN_INDEXES
+    PROCESSED -->|"Index Excel"| EXCEL_INDEX
     
-    subgraph OutputLayer["Output Layer"]
-        RESPONSE["API Response<br/>JSON"]
-        UI_UPDATE["UI Update<br/>Real-time"]
-    end
+    classDef uploads fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef processed fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef indexes fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     
-    subgraph DataStores["Data Stores"]
-        RAW["Raw Documents<br/>File System"]
-        PROCESSED["Processed Data<br/>JSON Files"]
-        VECTORS["Vector Embeddings<br/>LEANN"]
-        METADATA["Document Metadata<br/>LEANN"]
-    end
-    
-    %% Data Flow
-    UPLOAD --> RAW
-    RAW --> EXTRACT
-    EXTRACT --> CHUNK
-    CHUNK --> EMBED
-    EMBED --> STORE
-    STORE --> VECTORS
-    STORE --> METADATA
-    
-    QUERY --> SEARCH
-    SEARCH --> VECTORS
-    SEARCH --> GENERATE
-    GENERATE --> RESPONSE
-    RESPONSE --> UI_UPDATE
-    
-    %% Styling
-    classDef inputLayer fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef processingLayer fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef outputLayer fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef dataLayer fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
-    class UPLOAD,QUERY inputLayer
-    class EXTRACT,CHUNK,EMBED,STORE,SEARCH,GENERATE processingLayer
-    class RESPONSE,UI_UPDATE outputLayer
-    class RAW,PROCESSED,VECTORS,METADATA dataLayer
+    class UPLOADS uploads
+    class PROCESSED processed
+    class LEANN_INDEXES,EXCEL_INDEX indexes
 ```
 
 ## Key Technical Specifications
@@ -310,7 +242,7 @@ graph TD
 - **Chunk Overlap**: 100 characters (general), column-aware (Excel)
 - **Supported Formats**: PDF, DOCX, XLSX, PPTX, TXT, MD, HTML, XHTML, CSV, PNG, JPEG, TIFF, BMP, WEBP, AsciiDoc, XML
 - **Max File Size**: 100MB
-- **Processing Strategy**: 
+- **Processing Strategy**:
   - **General Documents**: Sentence-based chunking with paragraph awareness
   - **Excel Files**: Row-based chunking with column-aware processing (⚠️ EXPERIMENTAL)
 - **OCR Support**: Automatic text extraction from scanned PDFs and images
@@ -320,8 +252,8 @@ graph TD
 ### Vector Database
 
 - **Dual Storage Architecture**: LEANN for general documents, LlamaIndex for Excel files (⚠️ EXPERIMENTAL)
-- **Embedding Model**: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-- **Vector Dimension**: 384
+- **Embedding Model**: nomic-ai/nomic-embed-text-v2-moe
+- **Vector Dimension**: 768
 - **LEANN Database**: Ultra-efficient storage for general documents
   - **Index**: main_collection
   - **Storage Efficiency**: 97% space savings vs traditional vector databases
